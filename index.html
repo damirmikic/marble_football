@@ -1,0 +1,59 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Pixi.js Soccer</title>
+    <link rel="stylesheet" href="style.css">
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/pixi.js/7.4.0/pixi.min.js"></script>
+</head>
+
+<body>
+    <h1>Pixi Soccer</h1>
+    <div class="ui-container">
+        <div id="timer">Half: 1 - 45:00</div>
+        <div id="score">Red: 0 - Blue: 0</div>
+        <div id="speedDisplay">Speed: 1.0x</div>
+    </div>
+    <div class="match-config">
+        <label for="matchCount">Number of matches to simulate:</label>
+        <input type="number" id="matchCount" value="1" min="1" max="1000">
+        <label for="gameSpeed">Game Speed:</label>
+        <input type="number" id="gameSpeed" value="1" min="0.1" max="50" step="0.1" placeholder="1.0">
+        <button id="testSpeed" type="button">Test 5x Speed</button>
+        <button id="startMatches">Start Matches</button>
+        <button id="downloadCSV" style="display:none;">Download Match Data (CSV)</button>
+        <div id="matchProgress"></div>
+    </div>
+
+    <div class="match-config">
+        <label>Historical Data Generation:</label>
+        <input type="number" id="historyCount" value="1000" min="100" max="10000" placeholder="Number of matches">
+        <button id="generateData">Generate Historical Data</button>
+        <button id="downloadHistoricalData" style="display:none;">Download Historical Data (CSV)</button>
+        <div id="historyProgress"></div>
+        <div id="historyProgressBar" class="progress-bar-container" style="display: none;">
+            <div class="progress-bar">
+                <div id="historyProgressFill" class="progress-bar-fill"></div>
+            </div>
+            <div id="historyProgressText" class="progress-text">0%</div>
+        </div>
+    </div>
+
+    <!-- Goal Celebration Popups -->
+    <div id="goalPopup" class="goal-popup">
+        <div class="goal-content">
+            <video id="goalVideo" autoplay muted loop>
+                <source id="goalVideoSource" src="" type="video/mp4">
+                <img id="goalImage" src="" alt="Goal!" />
+            </video>
+            <div id="goalText">GOAL!</div>
+            <div id="goalScore"></div>
+        </div>
+    </div>
+
+    <script src="script.js"></script>
+</body>
+
+</html>
