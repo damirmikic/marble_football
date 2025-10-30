@@ -191,8 +191,9 @@ canvas {
     0% { transform: scale(1); }
     50% { transform: scale(1.1); }
     100% { transform: scale(1); }
-}/* Pr
-ogress Bar Styles */
+}
+
+/* Progress Bar Styles */
 .progress-bar-container {
     margin-top: 15px;
     width: 100%;
@@ -244,4 +245,1394 @@ ogress Bar Styles */
     margin-top: 10px;
     font-weight: bold;
     color: #ffeb3b;
+}
+
+/* Betting Dashboard Styles */
+.game-container {
+    display: flex;
+    gap: 20px;
+    max-width: 1400px;
+    margin: 0 auto;
+}
+
+.game-controls {
+    flex: 1;
+}
+
+.betting-dashboard {
+    width: 400px;
+    background: linear-gradient(135deg, #1e3c72 0%, #2a5298 100%);
+    border-radius: 15px;
+    padding: 20px;
+    color: white;
+    box-shadow: 0 10px 30px rgba(0,0,0,0.3);
+}
+
+.betting-dashboard h2 {
+    margin: 0 0 20px 0;
+    text-align: center;
+    font-size: 24px;
+    color: #fff;
+}
+
+.next-match-info {
+    background: rgba(255,255,255,0.1);
+    border-radius: 10px;
+    padding: 15px;
+    margin-bottom: 20px;
+    text-align: center;
+}
+
+.teams {
+    font-size: 18px;
+    font-weight: bold;
+    margin-bottom: 5px;
+}
+
+.match-countdown {
+    font-size: 14px;
+    color: #ffd700;
+}
+
+.betting-markets {
+    margin-bottom: 20px;
+}
+
+.market-section {
+    background: rgba(255,255,255,0.1);
+    border-radius: 10px;
+    padding: 15px;
+    margin-bottom: 15px;
+}
+
+.market-section h3 {
+    margin: 0 0 10px 0;
+    font-size: 16px;
+    color: #ffd700;
+}
+
+.odds-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(120px, 1fr));
+    gap: 8px;
+}
+
+.odd-item {
+    background: rgba(255,255,255,0.2);
+    border-radius: 8px;
+    padding: 10px;
+    text-align: center;
+    cursor: pointer;
+    transition: all 0.3s ease;
+    border: 2px solid transparent;
+}
+
+.odd-item:hover {
+    background: rgba(255,255,255,0.3);
+    border-color: #ffd700;
+    transform: translateY(-2px);
+}
+
+.outcome {
+    display: block;
+    font-size: 12px;
+    margin-bottom: 5px;
+    color: #e0e0e0;
+}
+
+.odd {
+    display: block;
+    font-size: 18px;
+    font-weight: bold;
+    color: #ffd700;
+}
+
+.stats-summary {
+    background: rgba(255,255,255,0.1);
+    border-radius: 10px;
+    padding: 15px;
+}
+
+.stats-summary h3 {
+    margin: 0 0 15px 0;
+    font-size: 16px;
+    color: #ffd700;
+}
+
+.stats-grid {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 10px;
+}
+
+.stat-item {
+    text-align: center;
+    padding: 8px;
+    background: rgba(255,255,255,0.1);
+    border-radius: 6px;
+}
+
+.stat-label {
+    display: block;
+    font-size: 12px;
+    color: #e0e0e0;
+    margin-bottom: 3px;
+}
+
+.stat-value {
+    display: block;
+    font-size: 16px;
+    font-weight: bold;
+    color: #ffd700;
+}
+
+/* Responsive adjustments */
+@media (max-width: 1200px) {
+    .game-container {
+        flex-direction: column;
+    }
+    
+    .betting-dashboard {
+        width: 100%;
+        max-width: 800px;
+        margin: 0 auto;
+    }
+    
+    .odds-grid {
+        grid-template-columns: repeat(3, 1fr);
+    }
+}
+
+@media (max-width: 768px) {
+    .betting-dashboard {
+        padding: 15px;
+    }
+    
+    .odds-grid {
+        grid-template-columns: 1fr;
+    }
+    
+    .stats-grid {
+        grid-template-columns: 1fr;
+    }
+}
+
+/* Updated Main Layout */
+.main-container {
+    display: flex;
+    gap: 20px;
+    max-width: 1800px;
+    margin: 0 auto;
+    padding: 20px;
+}
+
+.game-section {
+    flex: 1;
+    min-width: 800px;
+}
+
+.betting-section {
+    width: 800px;
+    min-width: 800px;
+}
+
+/* Balance Section */
+.balance-section {
+    background: rgba(255,255,255,0.1);
+    border-radius: 10px;
+    padding: 15px;
+    margin-bottom: 20px;
+    text-align: center;
+}
+
+.balance-section h2 {
+    margin: 0 0 10px 0;
+    font-size: 18px;
+}
+
+.balance-display {
+    font-size: 24px;
+    font-weight: bold;
+    color: #4CAF50;
+}
+
+/* Bet Slip */
+.bet-slip {
+    background: rgba(255,255,255,0.15);
+    border-radius: 10px;
+    padding: 15px;
+    margin-bottom: 20px;
+    border: 2px solid #ffd700;
+}
+
+.bet-slip h3 {
+    margin: 0 0 15px 0;
+    color: #ffd700;
+}
+
+.selected-bet {
+    background: rgba(255,255,255,0.1);
+    padding: 10px;
+    border-radius: 8px;
+    margin-bottom: 15px;
+    font-size: 14px;
+}
+
+.bet-input-section label {
+    display: block;
+    margin-bottom: 5px;
+    font-size: 14px;
+}
+
+.bet-input-section input {
+    width: 100%;
+    padding: 8px;
+    border: none;
+    border-radius: 5px;
+    margin-bottom: 10px;
+    font-size: 16px;
+    box-sizing: border-box;
+}
+
+.potential-win {
+    background: rgba(76, 175, 80, 0.2);
+    padding: 8px;
+    border-radius: 5px;
+    margin-bottom: 15px;
+    text-align: center;
+    font-weight: bold;
+    color: #4CAF50;
+}
+
+.place-bet-btn, .clear-bet-btn {
+    width: 48%;
+    padding: 10px;
+    border: none;
+    border-radius: 5px;
+    font-weight: bold;
+    cursor: pointer;
+    margin-right: 4%;
+}
+
+.place-bet-btn {
+    background: #4CAF50;
+    color: white;
+}
+
+.clear-bet-btn {
+    background: #f44336;
+    color: white;
+    margin-right: 0;
+}
+
+.place-bet-btn:hover {
+    background: #45a049;
+}
+
+.clear-bet-btn:hover {
+    background: #da190b;
+}
+
+/* Active Bets */
+.active-bets {
+    background: rgba(255,255,255,0.1);
+    border-radius: 10px;
+    padding: 15px;
+    margin-bottom: 20px;
+}
+
+.active-bets h3 {
+    margin: 0 0 15px 0;
+    color: #ffd700;
+}
+
+.bet-item {
+    background: rgba(255,255,255,0.1);
+    padding: 10px;
+    border-radius: 8px;
+    margin-bottom: 10px;
+    font-size: 12px;
+}
+
+.bet-item.winning {
+    border-left: 4px solid #4CAF50;
+}
+
+.bet-item.losing {
+    border-left: 4px solid #f44336;
+}
+
+.bet-item.pending {
+    border-left: 4px solid #ffd700;
+}
+
+.no-bets {
+    text-align: center;
+    color: #ccc;
+    font-style: italic;
+}
+
+/* Disabled betting markets */
+.betting-markets.disabled {
+    opacity: 0.5;
+    pointer-events: none;
+}
+
+.betting-markets.disabled::before {
+    content: "🔒 Betting suspended during match";
+    position: absolute;
+    top: 50%;
+    left: 50%;
+    transform: translate(-50%, -50%);
+    background: rgba(0,0,0,0.8);
+    color: white;
+    padding: 10px 20px;
+    border-radius: 10px;
+    font-weight: bold;
+    z-index: 10;
+}
+
+.betting-markets {
+    position: relative;
+}
+
+/* Override responsive for new layout */
+@media (max-width: 1200px) {
+    .main-container {
+        flex-direction: column;
+    }
+    
+    .betting-section {
+        width: 100%;
+        max-width: 800px;
+        margin: 0 auto;
+    }
+    
+    .game-section {
+        min-width: auto;
+    }
+}
+
+/* Selected bet styling */
+.odd-item.selected {
+    background: rgba(255, 215, 0, 0.3) !important;
+    border-color: #ffd700 !important;
+    transform: translateY(-2px);
+}
+
+/* Game Canvas Container */
+.game-canvas-container {
+    position: relative;
+    background: #2d2d2d;
+    border-radius: 15px;
+    padding: 20px;
+    margin-top: 20px;
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    min-height: 540px;
+    box-shadow: 0 10px 30px rgba(0,0,0,0.3);
+}
+
+.game-canvas-container canvas {
+    border-radius: 10px;
+    box-shadow: 0 5px 15px rgba(0,0,0,0.5);
+}
+
+/* Ensure game section takes proper space */
+.game-section {
+    display: flex;
+    flex-direction: column;
+    height: 100%;
+}
+
+.match-config {
+    background: rgba(255,255,255,0.1);
+    padding: 15px;
+    border-radius: 10px;
+    margin-bottom: 0;
+}
+
+/* Enhanced Betting Markets Styling */
+.markets-header {
+    background: linear-gradient(135deg, #ffd700 0%, #ffed4e 100%);
+    color: #1e3c72;
+    padding: 15px;
+    border-radius: 12px;
+    margin-bottom: 20px;
+    text-align: center;
+    box-shadow: 0 4px 15px rgba(255, 215, 0, 0.3);
+}
+
+.markets-header h2 {
+    margin: 0 0 8px 0;
+    font-size: 20px;
+    font-weight: bold;
+}
+
+.next-match-info .teams {
+    font-size: 16px;
+    font-weight: bold;
+    margin-bottom: 5px;
+}
+
+.next-match-info .match-countdown {
+    font-size: 12px;
+    opacity: 0.8;
+}
+
+/* Primary Market (Match Winner) */
+.primary-market {
+    background: linear-gradient(135deg, rgba(255,255,255,0.15) 0%, rgba(255,255,255,0.05) 100%);
+    border: 2px solid rgba(255, 215, 0, 0.3);
+    margin-bottom: 20px;
+}
+
+.market-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: 15px;
+    padding-bottom: 8px;
+    border-bottom: 1px solid rgba(255,255,255,0.2);
+}
+
+.market-header h3 {
+    margin: 0;
+    font-size: 16px;
+    color: #ffd700;
+}
+
+.market-header h4 {
+    margin: 0;
+    font-size: 14px;
+    color: #ffd700;
+}
+
+.market-info {
+    font-size: 11px;
+    color: #ccc;
+    font-style: italic;
+}
+
+/* Main odds styling */
+.main-odds {
+    display: grid;
+    grid-template-columns: 1fr 1fr 1fr;
+    gap: 8px;
+}
+
+.main-odds .odd-item {
+    padding: 15px 10px;
+    text-align: center;
+    border-radius: 10px;
+    cursor: pointer;
+    transition: all 0.3s ease;
+    border: 2px solid transparent;
+    background: rgba(255,255,255,0.1);
+}
+
+.main-odds .team-name {
+    font-size: 12px;
+    font-weight: bold;
+    margin-bottom: 8px;
+}
+
+.main-odds .odd-value {
+    font-size: 20px;
+    font-weight: bold;
+    color: #ffd700;
+}
+
+.red-team {
+    background: linear-gradient(135deg, rgba(244, 67, 54, 0.2) 0%, rgba(244, 67, 54, 0.1) 100%);
+}
+
+.blue-team {
+    background: linear-gradient(135deg, rgba(33, 150, 243, 0.2) 0%, rgba(33, 150, 243, 0.1) 100%);
+}
+
+.draw-option {
+    background: linear-gradient(135deg, rgba(158, 158, 158, 0.2) 0%, rgba(158, 158, 158, 0.1) 100%);
+}
+
+/* Markets row for side-by-side layout */
+.markets-row {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 15px;
+    margin-bottom: 15px;
+}
+
+/* Compact markets */
+.compact-market {
+    background: rgba(255,255,255,0.08);
+    padding: 12px;
+}
+
+.compact-market .market-header {
+    margin-bottom: 10px;
+    padding-bottom: 5px;
+}
+
+.compact-odds {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 6px;
+}
+
+.compact-odds .odd-item {
+    padding: 10px 8px;
+    text-align: center;
+    font-size: 12px;
+}
+
+.compact-odds .outcome {
+    display: block;
+    margin-bottom: 4px;
+    font-size: 11px;
+    color: #e0e0e0;
+}
+
+.compact-odds .odd-value {
+    display: block;
+    font-size: 16px;
+    font-weight: bold;
+    color: #ffd700;
+}
+
+/* Hover effects */
+.odd-item:hover {
+    transform: translateY(-2px);
+    box-shadow: 0 5px 15px rgba(255, 215, 0, 0.2);
+    border-color: #ffd700;
+}
+
+.main-odds .odd-item:hover {
+    transform: translateY(-3px);
+    box-shadow: 0 8px 25px rgba(255, 215, 0, 0.3);
+}
+
+/* Selected state enhancement */
+.odd-item.selected {
+    background: linear-gradient(135deg, rgba(255, 215, 0, 0.4) 0%, rgba(255, 215, 0, 0.2) 100%) !important;
+    border-color: #ffd700 !important;
+    transform: translateY(-2px);
+    box-shadow: 0 5px 20px rgba(255, 215, 0, 0.4);
+}
+
+/* Responsive adjustments */
+@media (max-width: 480px) {
+    .markets-row {
+        grid-template-columns: 1fr;
+    }
+    
+    .main-odds {
+        grid-template-columns: 1fr;
+        gap: 10px;
+    }
+    
+    .compact-odds {
+        grid-template-columns: 1fr;
+    }
+}
+
+/* Two Column Markets Layout */
+.markets-two-columns {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 15px;
+    margin-bottom: 20px;
+}
+
+.markets-column {
+    display: flex;
+    flex-direction: column;
+    gap: 15px;
+}
+
+.markets-column .compact-market {
+    height: fit-content;
+}
+
+/* Enhanced compact market styling for two columns */
+.markets-two-columns .compact-market {
+    background: linear-gradient(135deg, rgba(255,255,255,0.12) 0%, rgba(255,255,255,0.06) 100%);
+    border: 1px solid rgba(255, 215, 0, 0.2);
+    border-radius: 12px;
+    padding: 15px;
+    transition: all 0.3s ease;
+}
+
+.markets-two-columns .compact-market:hover {
+    border-color: rgba(255, 215, 0, 0.4);
+    transform: translateY(-2px);
+    box-shadow: 0 5px 15px rgba(255, 215, 0, 0.1);
+}
+
+.markets-two-columns .market-header h4 {
+    font-size: 15px;
+    margin: 0;
+    color: #ffd700;
+    text-align: center;
+}
+
+.markets-two-columns .compact-odds {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 8px;
+    margin-top: 12px;
+}
+
+.markets-two-columns .odd-item {
+    padding: 12px 8px;
+    background: rgba(255,255,255,0.08);
+    border-radius: 8px;
+    text-align: center;
+    cursor: pointer;
+    transition: all 0.3s ease;
+    border: 1px solid transparent;
+}
+
+.markets-two-columns .odd-item:hover {
+    background: rgba(255,255,255,0.15);
+    border-color: rgba(255, 215, 0, 0.5);
+    transform: translateY(-1px);
+}
+
+.markets-two-columns .outcome {
+    display: block;
+    font-size: 11px;
+    color: #e0e0e0;
+    margin-bottom: 6px;
+    font-weight: 500;
+}
+
+.markets-two-columns .odd-value {
+    display: block;
+    font-size: 18px;
+    font-weight: bold;
+    color: #ffd700;
+}
+
+/* Special styling for Match Specials */
+.markets-two-columns .market-section:has(.market-header h4:contains("Match Specials")) {
+    background: linear-gradient(135deg, rgba(255, 215, 0, 0.1) 0%, rgba(255, 215, 0, 0.05) 100%);
+}
+
+/* Responsive adjustments for two columns */
+@media (max-width: 600px) {
+    .markets-two-columns {
+        grid-template-columns: 1fr;
+        gap: 10px;
+    }
+    
+    .markets-column {
+        gap: 10px;
+    }
+    
+    .markets-two-columns .compact-odds {
+        grid-template-columns: 1fr;
+        gap: 6px;
+    }
+}
+
+/* Override previous markets-row styling */
+.markets-row {
+    display: none; /* Hide old layout if it exists */
+}
+
+/* Enhanced wider betting dashboard styling */
+.betting-dashboard {
+    padding: 30px;
+}
+
+/* Wider market columns with better spacing */
+.markets-two-columns {
+    gap: 25px;
+}
+
+.markets-two-columns .compact-market {
+    padding: 20px;
+    min-height: 120px;
+}
+
+/* Enhanced main odds with more space */
+.main-odds {
+    gap: 15px;
+    margin-bottom: 25px;
+}
+
+.main-odds .odd-item {
+    padding: 20px 15px;
+    min-width: 120px;
+    font-size: 16px;
+}
+
+/* Wider bet slip with better layout */
+.bet-slip {
+    padding: 25px;
+    margin-bottom: 25px;
+}
+
+.bet-input-section {
+    display: flex;
+    gap: 15px;
+    align-items: center;
+    margin-bottom: 20px;
+}
+
+.bet-input-section input {
+    padding: 12px;
+    font-size: 16px;
+    min-width: 120px;
+}
+
+/* Enhanced balance section */
+.balance-section {
+    padding: 25px;
+    margin-bottom: 25px;
+}
+
+.balance-display {
+    font-size: 32px;
+    margin-bottom: 15px;
+}
+
+/* Better active bets layout */
+.active-bets {
+    padding: 25px;
+}
+
+.bet-item {
+    padding: 18px;
+    margin-bottom: 15px;
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+}
+
+/* Enhanced stats with wider layout */
+.stats-summary {
+    padding: 25px;
+}
+
+.stats-grid {
+    gap: 20px;
+    grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
+}
+
+.stat-item {
+    padding: 15px;
+    text-align: center;
+}
+
+/* Better market headers */
+.market-header {
+    padding: 15px 20px;
+    font-size: 16px;
+    font-weight: 600;
+}
+
+/* Enhanced odds buttons */
+.odds-grid .odd-item,
+.special-bets .odd-item {
+    padding: 15px 12px;
+    min-height: 60px;
+    display: flex;
+    flex-direction: column;
+    justify-content: center;
+    align-items: center;
+}
+
+/* Two-Section Betting Markets Layout */
+.markets-section-container {
+    background: linear-gradient(135deg, #1a237e 0%, #283593 100%);
+    border-radius: 12px;
+    margin-bottom: 20px;
+    padding: 20px;
+    border: 2px solid #3949ab;
+    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.3);
+}
+
+.markets-section-header {
+    text-align: center;
+    margin-bottom: 20px;
+    padding-bottom: 15px;
+    border-bottom: 2px solid #3949ab;
+}
+
+.markets-section-header h3 {
+    color: #ffd700;
+    font-size: 20px;
+    font-weight: 700;
+    margin: 0;
+    text-shadow: 2px 2px 4px rgba(0, 0, 0, 0.5);
+}
+
+/* Enhanced primary market for main section */
+.markets-section-container .primary-market {
+    background: linear-gradient(135deg, #0d47a1 0%, #1565c0 100%);
+    border: 2px solid #1976d2;
+    margin-bottom: 20px;
+}
+
+.markets-section-container .primary-market .market-header {
+    background: linear-gradient(135deg, #0d47a1 0%, #1565c0 100%);
+    border-bottom: 2px solid #1976d2;
+}
+
+/* Different styling for special markets section */
+.markets-section-container:nth-child(4) {
+    background: linear-gradient(135deg, #4a148c 0%, #6a1b9a 100%);
+    border-color: #7b1fa2;
+}
+
+.markets-section-container:nth-child(4) .markets-section-header {
+    border-bottom-color: #7b1fa2;
+}
+
+.markets-section-container:nth-child(4) .compact-market {
+    background: linear-gradient(135deg, #4a148c 0%, #6a1b9a 100%);
+    border-color: #7b1fa2;
+}
+
+.markets-section-container:nth-child(4) .market-header {
+    background: linear-gradient(135deg, #4a148c 0%, #6a1b9a 100%);
+    border-bottom-color: #7b1fa2;
+}
+
+/* Enhanced spacing within sections */
+.markets-section-container .markets-two-columns {
+    gap: 20px;
+}
+
+.markets-section-container .compact-market {
+    padding: 18px;
+    margin-bottom: 0;
+}
+
+/* Better visual separation */
+.betting-markets {
+    padding: 25px;
+}
+
+.markets-header {
+    margin-bottom: 25px;
+    text-align: center;
+    padding: 20px;
+    background: linear-gradient(135deg, #0d47a1 0%, #1565c0 100%);
+    border-radius: 12px;
+    border: 2px solid #1976d2;
+}
+
+.markets-header h2 {
+    color: #ffd700;
+    font-size: 24px;
+    margin-bottom: 10px;
+    text-shadow: 2px 2px 4px rgba(0, 0, 0, 0.5);
+}
+
+.next-match-info {
+    color: #e3f2fd;
+    font-size: 16px;
+}
+
+.teams {
+    font-weight: 600;
+    margin-bottom: 5px;
+}
+
+.match-countdown {
+    font-size: 14px;
+    opacity: 0.9;
+}
+
+/* Betting Markets Structure - Matching Image Layout */
+.betting-markets {
+    padding: 20px;
+    background: linear-gradient(135deg, #1a237e 0%, #283593 100%);
+    border-radius: 12px;
+    border: 2px solid #3949ab;
+}
+
+/* Section Headers */
+.section-header {
+    background: linear-gradient(135deg, #0d47a1 0%, #1565c0 100%);
+    padding: 12px 20px;
+    border-radius: 8px;
+    margin-bottom: 15px;
+    text-align: center;
+    border: 1px solid #1976d2;
+}
+
+.section-header h3 {
+    color: #ffd700;
+    font-size: 18px;
+    font-weight: 700;
+    margin: 0;
+    text-shadow: 1px 1px 2px rgba(0, 0, 0, 0.5);
+}
+
+/* Markets Sections */
+.markets-section {
+    margin-bottom: 25px;
+}
+
+.main-markets-section {
+    background: linear-gradient(135deg, #1565c0 0%, #1976d2 100%);
+    padding: 20px;
+    border-radius: 10px;
+    border: 2px solid #1976d2;
+}
+
+.special-markets-section {
+    background: linear-gradient(135deg, #4a148c 0%, #6a1b9a 100%);
+    padding: 20px;
+    border-radius: 10px;
+    border: 2px solid #7b1fa2;
+}
+
+/* Market Containers */
+.market-container {
+    background: rgba(255, 255, 255, 0.1);
+    border-radius: 8px;
+    margin-bottom: 15px;
+    border: 1px solid rgba(255, 255, 255, 0.2);
+    overflow: hidden;
+}
+
+.match-winner-market {
+    margin-bottom: 20px;
+}
+
+/* Market Headers */
+.market-header {
+    background: rgba(0, 0, 0, 0.3);
+    padding: 10px 15px;
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    border-bottom: 1px solid rgba(255, 255, 255, 0.1);
+}
+
+.market-icon {
+    font-size: 16px;
+}
+
+.market-title {
+    color: #ffffff;
+    font-weight: 600;
+    font-size: 14px;
+}
+
+.market-subtitle {
+    color: #e3f2fd;
+    font-size: 12px;
+    margin-left: auto;
+}
+
+/* Betting Notice */
+.betting-notice {
+    background: rgba(255, 152, 0, 0.2);
+    border: 1px solid #ff9800;
+    border-radius: 6px;
+    padding: 8px 12px;
+    margin-bottom: 15px;
+    display: flex;
+    align-items: center;
+    gap: 8px;
+}
+
+.notice-icon {
+    font-size: 14px;
+}
+
+.notice-text {
+    color: #fff3e0;
+    font-size: 12px;
+    font-weight: 500;
+}
+
+/* Markets Row Layout */
+.markets-row {
+    display: flex;
+    gap: 15px;
+}
+
+.markets-row .market-container {
+    flex: 1;
+}
+
+/* Odds Rows */
+.odds-row {
+    display: flex;
+    padding: 15px;
+    gap: 10px;
+}
+
+.main-odds-row {
+    gap: 8px;
+}
+
+.main-odds-row .odd-button {
+    flex: 1;
+    min-height: 70px;
+}
+
+/* Odd Buttons */
+.odd-button {
+    background: linear-gradient(135deg, #0d47a1 0%, #1565c0 100%);
+    border: 1px solid #1976d2;
+    border-radius: 6px;
+    padding: 12px 8px;
+    cursor: pointer;
+    transition: all 0.2s ease;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    text-align: center;
+    min-height: 60px;
+}
+
+.odd-button:hover {
+    background: linear-gradient(135deg, #1565c0 0%, #1976d2 100%);
+    border-color: #2196f3;
+    transform: translateY(-1px);
+    box-shadow: 0 4px 8px rgba(0, 0, 0, 0.3);
+}
+
+.odd-button.selected {
+    background: linear-gradient(135deg, #388e3c 0%, #4caf50 100%);
+    border-color: #4caf50;
+}
+
+/* Team Labels and Outcome Labels */
+.team-label,
+.outcome-label {
+    color: #ffffff;
+    font-size: 12px;
+    font-weight: 600;
+    margin-bottom: 4px;
+    line-height: 1.2;
+}
+
+/* Odd Values */
+.odd-value {
+    color: #ffd700;
+    font-size: 18px;
+    font-weight: 700;
+    text-shadow: 1px 1px 2px rgba(0, 0, 0, 0.5);
+}
+
+.main-odds-row .odd-value {
+    font-size: 20px;
+}
+
+/* Team-specific styling */
+.red-team {
+    background: linear-gradient(135deg, #c62828 0%, #d32f2f 100%);
+    border-color: #d32f2f;
+}
+
+.red-team:hover {
+    background: linear-gradient(135deg, #d32f2f 0%, #f44336 100%);
+    border-color: #f44336;
+}
+
+.blue-team {
+    background: linear-gradient(135deg, #1565c0 0%, #1976d2 100%);
+    border-color: #1976d2;
+}
+
+.blue-team:hover {
+    background: linear-gradient(135deg, #1976d2 0%, #2196f3 100%);
+    border-color: #2196f3;
+}
+
+.draw-option {
+    background: linear-gradient(135deg, #558b2f 0%, #689f38 100%);
+    border-color: #689f38;
+}
+
+.draw-option:hover {
+    background: linear-gradient(135deg, #689f38 0%, #8bc34a 100%);
+    border-color: #8bc34a;
+}
+
+/* Special Markets Styling */
+.special-markets-section .odd-button {
+    background: linear-gradient(135deg, #4a148c 0%, #6a1b9a 100%);
+    border-color: #7b1fa2;
+}
+
+.special-markets-section .odd-button:hover {
+    background: linear-gradient(135deg, #6a1b9a 0%, #8e24aa 100%);
+    border-color: #9c27b0;
+}
+
+/* Responsive adjustments */
+@media (max-width: 768px) {
+    .markets-row {
+        flex-direction: column;
+    }
+    
+    .main-odds-row {
+        flex-wrap: wrap;
+    }
+    
+    .main-odds-row .odd-button {
+        min-width: 100px;
+    }
+}
+
+/* Goals Grid Layout for Multiple Betting Lines */
+.goals-grid {
+    display: grid;
+    grid-template-columns: repeat(2, 1fr);
+    gap: 8px;
+    padding: 12px;
+}
+
+.goals-grid .odd-button {
+    min-height: 50px;
+    padding: 8px 6px;
+}
+
+.goals-grid .outcome-label {
+    font-size: 11px;
+    margin-bottom: 3px;
+}
+
+.goals-grid .odd-value {
+    font-size: 16px;
+}
+
+/* Adjust market containers for goals markets */
+.goals-market,
+.first-half-market {
+    min-height: 180px;
+}
+
+/* Better spacing for goals markets */
+.goals-market .market-header,
+.first-half-market .market-header {
+    padding: 8px 12px;
+}
+
+.goals-market .market-title,
+.first-half-market .market-title {
+    font-size: 13px;
+}
+
+/* Responsive adjustments for wider betting container */
+@media (max-width: 1400px) {
+    .betting-section {
+        width: 600px;
+        min-width: 600px;
+    }
+    
+    .main-container {
+        max-width: 1600px;
+    }
+}
+
+@media (max-width: 1200px) {
+    .betting-section {
+        width: 500px;
+        min-width: 500px;
+    }
+    
+    .main-container {
+        max-width: 1400px;
+    }
+}
+
+@media (max-width: 768px) {
+    .betting-section {
+        width: 100%;
+        min-width: auto;
+    }
+    
+    .main-container {
+        flex-direction: column;
+        max-width: 100%;
+    }
+}
+
+/* Enhanced hover effects for goals buttons */
+.goals-grid .odd-button:hover {
+    transform: translateY(-1px);
+    box-shadow: 0 3px 6px rgba(0, 0, 0, 0.2);
+}
+
+/* Color variations for different goal lines */
+.goals-grid .odd-button[data-outcome*="1.5"] {
+    border-left: 3px solid #4caf50;
+}
+
+.goals-grid .odd-button[data-outcome*="2.5"] {
+    border-left: 3px solid #ff9800;
+}
+
+.goals-grid .odd-button[data-outcome*="3.5"] {
+    border-left: 3px solid #f44336;
+}
+
+/* Special styling for first half goals */
+.first-half-market .goals-grid .odd-button[data-outcome*="0.5"] {
+    border-left: 3px solid #2196f3;
+}
+
+.first-half-market .goals-grid .odd-button[data-outcome*="1.5"] {
+    border-left: 3px solid #9c27b0;
+}
+
+.first-half-market .goals-grid .odd-button[data-outcome*="2.5"] {
+    border-left: 3px solid #e91e63;
+}
+
+/* Game Overlay Styles */
+.game-overlay {
+    position: absolute;
+    top: 0;
+    left: 0;
+    right: 0;
+    z-index: 10;
+    pointer-events: none;
+}
+
+.game-status-bar {
+    background: linear-gradient(135deg, rgba(0, 0, 0, 0.85) 0%, rgba(20, 20, 20, 0.85) 100%);
+    backdrop-filter: blur(10px);
+    border-bottom: 2px solid #00ff88;
+    padding: 12px 20px;
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    font-family: 'Arial', sans-serif;
+    box-shadow: 0 2px 10px rgba(0, 0, 0, 0.3);
+}
+
+.match-info {
+    display: flex;
+    gap: 30px;
+    align-items: center;
+}
+
+.match-timer {
+    color: #00ff88;
+    font-size: 18px;
+    font-weight: bold;
+    text-shadow: 0 0 10px rgba(0, 255, 136, 0.5);
+    letter-spacing: 1px;
+}
+
+.match-score {
+    color: #ffffff;
+    font-size: 16px;
+    font-weight: 600;
+}
+
+.match-score .team-red {
+    color: #ff4444;
+}
+
+.match-score .team-blue {
+    color: #4488ff;
+}
+
+.betting-status-info {
+    display: flex;
+    gap: 20px;
+    align-items: center;
+}
+
+.betting-timer {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    background: rgba(255, 193, 7, 0.2);
+    border: 1px solid #ffc107;
+    border-radius: 20px;
+    padding: 6px 12px;
+}
+
+.timer-label {
+    color: #ffc107;
+    font-size: 12px;
+    font-weight: 600;
+    text-transform: uppercase;
+}
+
+.timer-value {
+    color: #ffffff;
+    font-size: 14px;
+    font-weight: bold;
+    font-family: 'Courier New', monospace;
+}
+
+.market-status {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    background: rgba(0, 255, 136, 0.1);
+    border: 1px solid #00ff88;
+    border-radius: 20px;
+    padding: 6px 12px;
+}
+
+.status-indicator {
+    font-size: 12px;
+    animation: pulse 2s infinite;
+}
+
+.status-indicator.open {
+    color: #00ff88;
+}
+
+.status-indicator.closed {
+    color: #ff4444;
+}
+
+.status-indicator.suspended {
+    color: #ffc107;
+}
+
+.status-text {
+    color: #ffffff;
+    font-size: 12px;
+    font-weight: 600;
+    text-transform: uppercase;
+}
+
+@keyframes pulse {
+    0%, 100% { opacity: 1; }
+    50% { opacity: 0.5; }
+}
+
+/* Responsive adjustments */
+@media (max-width: 768px) {
+    .game-status-bar {
+        flex-direction: column;
+        gap: 10px;
+        padding: 10px 15px;
+    }
+    
+    .match-info {
+        gap: 20px;
+    }
+    
+    .betting-status-info {
+        gap: 15px;
+    }
+    
+    .match-timer {
+        font-size: 16px;
+    }
+    
+    .match-score {
+        font-size: 14px;
+    }
 }
