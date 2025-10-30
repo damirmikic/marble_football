@@ -1,0 +1,247 @@
+body {
+    font-family: Arial, sans-serif;
+    background-color: #333;
+    color: white;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    margin: 0;
+    padding: 20px;
+}
+
+canvas {
+    background-color: #008000; /* Fallback green */
+    border: 2px solid white;
+    box-shadow: 0 0 15px rgba(0,0,0,0.5);
+}
+
+.ui-container {
+    display: flex;
+    justify-content: space-between;
+    width: 800px;
+    margin: 10px 0;
+    font-size: 1.5em;
+    font-weight: bold;
+}
+
+#timer {
+    color: #ffeb3b; /* Yellow */
+}
+
+#score {
+    color: #ffffff;
+}
+
+#speedDisplay {
+    color: #4CAF50; /* Green */
+    font-size: 0.9em;
+}
+
+/* Add team colors to the score for clarity */
+#score .team-red { color: #f44336; }
+#score .team-blue { color: #2196f3; }
+
+.match-config {
+    background-color: #444;
+    padding: 15px;
+    border-radius: 8px;
+    margin: 10px 0;
+    text-align: center;
+    width: 800px;
+    box-sizing: border-box;
+}
+
+.match-config label {
+    display: block;
+    margin-bottom: 10px;
+    font-weight: bold;
+}
+
+.match-config input {
+    padding: 8px;
+    margin: 0 10px;
+    border: none;
+    border-radius: 4px;
+    font-size: 16px;
+    width: 80px;
+    text-align: center;
+}
+
+.match-config button {
+    padding: 10px 20px;
+    margin: 0 5px;
+    border: none;
+    border-radius: 4px;
+    background-color: #4CAF50;
+    color: white;
+    font-size: 16px;
+    cursor: pointer;
+    transition: background-color 0.3s;
+}
+
+.match-config button:hover {
+    background-color: #45a049;
+}
+
+.match-config button:disabled {
+    background-color: #666;
+    cursor: not-allowed;
+}
+
+#matchProgress {
+    margin-top: 10px;
+    font-weight: bold;
+    color: #ffeb3b;
+}
+
+/* Goal Celebration Popup */
+.goal-popup {
+    position: fixed;
+    top: 0;
+    left: 0;
+    width: 100%;
+    height: 100%;
+    background-color: rgba(0, 0, 0, 0.8);
+    display: none;
+    justify-content: center;
+    align-items: center;
+    z-index: 1000;
+    animation: fadeIn 0.3s ease-in;
+}
+
+.goal-popup.show {
+    display: flex;
+}
+
+.goal-content {
+    text-align: center;
+    background-color: rgba(255, 255, 255, 0.1);
+    padding: 30px;
+    border-radius: 15px;
+    border: 3px solid #fff;
+    animation: bounceIn 0.6s ease-out;
+}
+
+.goal-content img,
+.goal-content video {
+    width: 300px;
+    height: 300px;
+    object-fit: contain;
+    margin-bottom: 20px;
+    border-radius: 15px;
+    box-shadow: 0 0 30px rgba(255, 255, 255, 0.5);
+}
+
+.goal-content video {
+    background-color: transparent;
+}
+
+.goal-content img {
+    display: none; /* Hidden by default, shown only as fallback */
+}
+
+#goalText {
+    font-size: 3em;
+    font-weight: bold;
+    margin-bottom: 15px;
+    text-shadow: 2px 2px 4px rgba(0, 0, 0, 0.8);
+    animation: pulse 1s infinite;
+}
+
+#goalScore {
+    font-size: 2em;
+    font-weight: bold;
+    text-shadow: 1px 1px 2px rgba(0, 0, 0, 0.8);
+}
+
+/* Red team goal styling */
+.goal-popup.red-goal .goal-content {
+    border-color: #f44336;
+    background-color: rgba(244, 67, 54, 0.2);
+}
+
+.goal-popup.red-goal #goalText {
+    color: #f44336;
+}
+
+/* Blue team goal styling */
+.goal-popup.blue-goal .goal-content {
+    border-color: #2196f3;
+    background-color: rgba(33, 150, 243, 0.2);
+}
+
+.goal-popup.blue-goal #goalText {
+    color: #2196f3;
+}
+
+/* Animations */
+@keyframes fadeIn {
+    from { opacity: 0; }
+    to { opacity: 1; }
+}
+
+@keyframes bounceIn {
+    0% { transform: scale(0.3); opacity: 0; }
+    50% { transform: scale(1.05); }
+    70% { transform: scale(0.9); }
+    100% { transform: scale(1); opacity: 1; }
+}
+
+@keyframes pulse {
+    0% { transform: scale(1); }
+    50% { transform: scale(1.1); }
+    100% { transform: scale(1); }
+}/* Pr
+ogress Bar Styles */
+.progress-bar-container {
+    margin-top: 15px;
+    width: 100%;
+}
+
+.progress-bar {
+    width: 100%;
+    height: 20px;
+    background-color: #666;
+    border-radius: 10px;
+    overflow: hidden;
+    box-shadow: inset 0 2px 4px rgba(0, 0, 0, 0.3);
+}
+
+.progress-bar-fill {
+    height: 100%;
+    background: linear-gradient(90deg, #4CAF50, #45a049);
+    width: 0%;
+    transition: width 0.3s ease;
+    border-radius: 10px;
+    position: relative;
+}
+
+.progress-bar-fill::after {
+    content: '';
+    position: absolute;
+    top: 0;
+    left: 0;
+    right: 0;
+    bottom: 0;
+    background: linear-gradient(90deg, transparent, rgba(255, 255, 255, 0.2), transparent);
+    animation: shimmer 2s infinite;
+}
+
+.progress-text {
+    text-align: center;
+    margin-top: 8px;
+    font-weight: bold;
+    color: #ffeb3b;
+    font-size: 14px;
+}
+
+@keyframes shimmer {
+    0% { transform: translateX(-100%); }
+    100% { transform: translateX(100%); }
+}
+
+#historyProgress {
+    margin-top: 10px;
+    font-weight: bold;
+    color: #ffeb3b;
+}
