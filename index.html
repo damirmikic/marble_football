@@ -6,6 +6,7 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Pixi.js Soccer</title>
     <link rel="stylesheet" href="style.css">
+    <link rel="stylesheet" href="betting-ui.css">
     <script src="https://cdnjs.cloudflare.com/ajax/libs/pixi.js/7.4.0/pixi.min.js"></script>
 </head>
 
@@ -16,30 +17,293 @@
         <div id="score">Red: 0 - Blue: 0</div>
         <div id="speedDisplay">Speed: 1.0x</div>
     </div>
-    <div class="match-config">
-        <label for="matchCount">Number of matches to simulate:</label>
-        <input type="number" id="matchCount" value="1" min="1" max="1000">
-        <label for="gameSpeed">Game Speed:</label>
-        <input type="number" id="gameSpeed" value="1" min="0.1" max="50" step="0.1" placeholder="1.0">
-        <button id="testSpeed" type="button">Test 5x Speed</button>
-        <button id="startMatches">Start Matches</button>
-        <button id="downloadCSV" style="display:none;">Download Match Data (CSV)</button>
-        <div id="matchProgress"></div>
-    </div>
-
-    <div class="match-config">
-        <label>Historical Data Generation:</label>
-        <input type="number" id="historyCount" value="1000" min="100" max="10000" placeholder="Number of matches">
-        <button id="generateData">Generate Historical Data</button>
-        <button id="downloadHistoricalData" style="display:none;">Download Historical Data (CSV)</button>
-        <div id="historyProgress"></div>
-        <div id="historyProgressBar" class="progress-bar-container" style="display: none;">
-            <div class="progress-bar">
-                <div id="historyProgressFill" class="progress-bar-fill"></div>
+    <div class="main-container">
+        <div class="game-section">
+            <div class="match-config">
+                <label for="matchCount">Number of matches to simulate:</label>
+                <input type="number" id="matchCount" value="1" min="1" max="1000">
+                <label for="gameSpeed">Game Speed:</label>
+                <input type="number" id="gameSpeed" value="1" min="0.1" max="50" step="0.1" placeholder="1.0">
+                <button id="testSpeed" type="button">Test 5x Speed</button>
+                <button id="startMatches">Start Matches</button>
+                <button id="downloadCSV" style="display:none;">Download Match Data (CSV)</button>
+                <div id="matchProgress"></div>
             </div>
-            <div id="historyProgressText" class="progress-text">0%</div>
+            <div class="game-canvas-container" id="gameCanvasContainer">
+                <!-- Game overlay with timer and status -->
+                <div class="game-overlay">
+                    <div class="game-status-bar">
+                        <div class="match-info">
+                            <div class="match-timer" id="gameTimer">Half: 1 - 00:00</div>
+                            <div class="match-score" id="gameScore">Red: 0 - Blue: 0</div>
+                        </div>
+                        <div class="betting-status-info">
+                            <div class="betting-timer" id="overlayBettingTimer" style="display: none;">
+                                <span class="timer-label">Betting:</span>
+                                <span class="timer-value" id="overlayTimerValue">0:20</span>
+                            </div>
+                            <div class="market-status" id="overlayMarketStatus">
+                                <span class="status-indicator" id="overlayStatusIndicator">●</span>
+                                <span class="status-text" id="overlayStatusText">Markets Open</span>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+                <!-- PIXI game canvas will be inserted here -->
+            </div>
+        </div>
+
+        <div class="betting-section">
+            <div class="betting-dashboard">
+                <div class="balance-section">
+                    <h2>💰 Your Balance</h2>
+                    <div class="balance-display">
+                        <span class="balance-amount" id="userBalance">$1000.00</span>
+                    </div>
+                </div>
+
+                <div class="bet-slip" id="betSlip">
+                    <h3>🎫 Bet Slip</h3>
+                    <div class="bet-slip-content">
+                        <div id="betMessage" class="bet-message" style="display: none;"></div>
+                        
+                        <div id="emptyBetslip" class="empty-betslip">
+                            <div class="empty-betslip-icon">🎯</div>
+                            <div class="empty-betslip-text">Your bet slip is empty</div>
+                            <div class="empty-betslip-subtext">Click on odds to add selections</div>
+                        </div>
+                        
+                        <div id="betslipContent" style="display: none;">
+                            <div class="selected-bet" id="selectedBet">
+                                <div class="bet-selection">
+                                    <div>
+                                        <div class="bet-market-name" id="betMarketName"></div>
+                                        <div class="bet-selection-name" id="betSelectionName"></div>
+                                    </div>
+                                    <div class="bet-odds" id="betOdds"></div>
+                                </div>
+                            </div>
+                            
+                            <div class="bet-input-section">
+                                <div class="bet-amount-input">
+                                    <label for="betAmount">Stake Amount</label>
+                                    <input type="number" id="betAmount" min="1" max="1000" step="1" placeholder="10">
+                                </div>
+                                
+                                <div class="potential-win">
+                                    <div class="potential-win-label">Potential Win</div>
+                                    <div class="potential-win-amount">$<span id="potentialWin">0.00</span></div>
+                                </div>
+                                
+                                <div class="bet-buttons">
+                                    <button id="placeBet" class="place-bet-btn">Place Bet</button>
+                                    <button id="clearBet" class="clear-bet-btn">Clear</button>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="betting-markets" id="bettingMarkets">
+                    <!-- Match Header -->
+                    <div class="match-header">
+                        <div class="match-info">
+                            <div class="teams-display">
+                                <div class="team red-team-info">
+                                    <span class="team-icon">🔴</span>
+                                    <span class="team-name">Red Team</span>
+                                </div>
+                                <div class="vs-separator">VS</div>
+                                <div class="team blue-team-info">
+                                    <span class="team-icon">🔵</span>
+                                    <span class="team-name">Blue Team</span>
+                                </div>
+                            </div>
+                            <div class="match-status">
+                                <span class="live-indicator">● LIVE</span>
+                                <span class="match-time" id="matchTime">45:00</span>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Betting Status and Timer -->
+                    <div class="betting-status-bar">
+                        <div id="bettingStatus" class="betting-status open">
+                            <div class="betting-status-open">
+                                <span class="status-icon">🟢</span>
+                                <span class="status-text">Betting Open</span>
+                            </div>
+                        </div>
+                        <div id="bettingTimerContainer" class="betting-timer-container">
+                            <div class="timer-label">Time to bet:</div>
+                            <div id="bettingTimer" class="betting-timer">0:20</div>
+                        </div>
+                    </div>
+
+                    <!-- Main Market - Match Winner -->
+                    <div class="market-card primary-market">
+                        <div class="market-title-bar">
+                            <h3 class="market-name">Match Winner</h3>
+                            <span class="market-type">Full Time</span>
+                        </div>
+                        <div class="odds-container main-odds">
+                            <button class="odds-btn red-win" data-market="1x2" data-outcome="red-win" data-odd="2.78">
+                                <div class="selection-name">Red Team</div>
+                                <div class="odds-value" id="redWinOdd">2.78</div>
+                            </button>
+                            <button class="odds-btn draw-win" data-market="1x2" data-outcome="draw" data-odd="3.31">
+                                <div class="selection-name">Draw</div>
+                                <div class="odds-value" id="drawOdd">3.31</div>
+                            </button>
+                            <button class="odds-btn blue-win" data-market="1x2" data-outcome="blue-win" data-odd="2.58">
+                                <div class="selection-name">Blue Team</div>
+                                <div class="odds-value" id="blueWinOdd">2.58</div>
+                            </button>
+                        </div>
+                    </div>
+
+                    <!-- Goals Markets Grid -->
+                    <div class="markets-grid">
+                        <!-- Total Goals -->
+                        <div class="market-card">
+                            <div class="market-title-bar">
+                                <h4 class="market-name">Total Goals</h4>
+                                <span class="market-info">Full Time</span>
+                            </div>
+                            <div class="odds-container goals-odds">
+                                <div class="odds-row">
+                                    <button class="odds-btn compact" data-market="total-goals" data-outcome="over-1.5" data-odd="1.45">
+                                        <span class="selection">Over 1.5</span>
+                                        <span class="odds-value" id="over15Odd">1.45</span>
+                                    </button>
+                                    <button class="odds-btn compact" data-market="total-goals" data-outcome="under-1.5" data-odd="2.85">
+                                        <span class="selection">Under 1.5</span>
+                                        <span class="odds-value" id="under15Odd">2.85</span>
+                                    </button>
+                                </div>
+                                <div class="odds-row">
+                                    <button class="odds-btn compact" data-market="total-goals" data-outcome="over-2.5" data-odd="2.31">
+                                        <span class="selection">Over 2.5</span>
+                                        <span class="odds-value" id="over25Odd">2.31</span>
+                                    </button>
+                                    <button class="odds-btn compact" data-market="total-goals" data-outcome="under-2.5" data-odd="1.62">
+                                        <span class="selection">Under 2.5</span>
+                                        <span class="odds-value" id="under25Odd">1.62</span>
+                                    </button>
+                                </div>
+                                <div class="odds-row">
+                                    <button class="odds-btn compact" data-market="total-goals" data-outcome="over-3.5" data-odd="3.75">
+                                        <span class="selection">Over 3.5</span>
+                                        <span class="odds-value" id="over35Odd">3.75</span>
+                                    </button>
+                                    <button class="odds-btn compact" data-market="total-goals" data-outcome="under-3.5" data-odd="1.28">
+                                        <span class="selection">Under 3.5</span>
+                                        <span class="odds-value" id="under35Odd">1.28</span>
+                                    </button>
+                                </div>
+                            </div>
+                        </div>
+
+                        <!-- Both Teams to Score -->
+                        <div class="market-card">
+                            <div class="market-title-bar">
+                                <h4 class="market-name">Both Teams to Score</h4>
+                                <span class="market-info">Full Time</span>
+                            </div>
+                            <div class="odds-container btts-odds">
+                                <button class="odds-btn wide" data-market="btts" data-outcome="yes" data-odd="1.91">
+                                    <span class="selection">Yes</span>
+                                    <span class="odds-value" id="bttsYesOdd">1.91</span>
+                                </button>
+                                <button class="odds-btn wide" data-market="btts" data-outcome="no" data-odd="1.90">
+                                    <span class="selection">No</span>
+                                    <span class="odds-value" id="bttsNoOdd">1.90</span>
+                                </button>
+                            </div>
+                        </div>
+
+                        <!-- First Half Goals -->
+                        <div class="market-card">
+                            <div class="market-title-bar">
+                                <h4 class="market-name">First Half Goals</h4>
+                                <span class="market-info">1st Half</span>
+                            </div>
+                            <div class="odds-container goals-odds">
+                                <div class="odds-row">
+                                    <button class="odds-btn compact" data-market="fh-goals" data-outcome="over-0.5" data-odd="1.38">
+                                        <span class="selection">Over 0.5</span>
+                                        <span class="odds-value" id="fhOver05Odd">1.38</span>
+                                    </button>
+                                    <button class="odds-btn compact" data-market="fh-goals" data-outcome="under-0.5" data-odd="3.07">
+                                        <span class="selection">Under 0.5</span>
+                                        <span class="odds-value" id="fhUnder05Odd">3.07</span>
+                                    </button>
+                                </div>
+                                <div class="odds-row">
+                                    <button class="odds-btn compact" data-market="fh-goals" data-outcome="over-1.5" data-odd="3.25">
+                                        <span class="selection">Over 1.5</span>
+                                        <span class="odds-value" id="fhOver15Odd">3.25</span>
+                                    </button>
+                                    <button class="odds-btn compact" data-market="fh-goals" data-outcome="under-1.5" data-odd="1.35">
+                                        <span class="selection">Under 1.5</span>
+                                        <span class="odds-value" id="fhUnder15Odd">1.35</span>
+                                    </button>
+                                </div>
+                                <div class="odds-row">
+                                    <button class="odds-btn compact" data-market="fh-goals" data-outcome="over-2.5" data-odd="8.50">
+                                        <span class="selection">Over 2.5</span>
+                                        <span class="odds-value" id="fhOver25Odd">8.50</span>
+                                    </button>
+                                    <button class="odds-btn compact" data-market="fh-goals" data-outcome="under-2.5" data-odd="1.08">
+                                        <span class="selection">Under 2.5</span>
+                                        <span class="odds-value" id="fhUnder25Odd">1.08</span>
+                                    </button>
+                                </div>
+                            </div>
+                        </div>
+
+                        <!-- Match Specials -->
+                        <div class="market-card">
+                            <div class="market-title-bar">
+                                <h4 class="market-name">Match Specials</h4>
+                                <span class="market-info">Full Time</span>
+                            </div>
+                            <div class="odds-container specials-odds">
+                                <button class="odds-btn wide" data-market="specials" data-outcome="red-clean-sheet" data-odd="3.20">
+                                    <span class="selection">Red Clean Sheet</span>
+                                    <span class="odds-value">3.20</span>
+                                </button>
+                                <button class="odds-btn wide" data-market="specials" data-outcome="blue-clean-sheet" data-odd="3.10">
+                                    <span class="selection">Blue Clean Sheet</span>
+                                    <span class="odds-value">3.10</span>
+                                </button>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Live Betting Notice -->
+                    <div class="live-notice">
+                        <div class="notice-content">
+                            <span class="notice-icon">⚡</span>
+                            <span class="notice-text">Live betting - odds change in real time</span>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <div class="active-bets" id="activeBets">
+                <h3>🎲 Active Bets</h3>
+                <div class="bets-list" id="betsList">
+                    <div class="no-bets">No active bets</div>
+                </div>
+            </div>
+
+
         </div>
     </div>
+    </div>
+
+
 
     <!-- Goal Celebration Popups -->
     <div id="goalPopup" class="goal-popup">
