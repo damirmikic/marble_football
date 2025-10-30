@@ -35,6 +35,7 @@ let gameRunning = false; // Start paused for initial setup
 let gameStarted = false;
 let injuryTime = { first: 0, second: 0 };
 let injuryTimeStarted = false;
+let matchTransitioning = false; // Prevent overlapping match transitions
 
 // Simulation mode variables
 let simulationMode = false;
@@ -147,7 +148,24 @@ const app = new PIXI.Application({
     height: SCREEN_HEIGHT,
     backgroundColor: 0x008000 // Field green
 });
-document.body.appendChild(app.view);
+
+// Append canvas to the game container instead of body
+function initGameCanvas() {
+    const gameContainer = document.getElementById('gameCanvasContainer');
+    if (gameContainer) {
+        gameContainer.appendChild(app.view);
+    } else {
+        // Fallback to body if container not found
+        document.body.appendChild(app.view);
+    }
+}
+
+// Initialize canvas when DOM is ready
+if (document.readyState === 'loading') {
+    document.addEventListener('DOMContentLoaded', initGameCanvas);
+} else {
+    initGameCanvas();
+}
 
 // Arrays for game objects
 const players = [];
@@ -265,7 +283,7 @@ function createGameMessage() {
 
 function showGameMessage(text, duration = 3000) {
     if (simulationMode) return; // Skip messages in simulation mode
-    
+
     gameMessage.text = text;
     gameMessage.visible = true;
     setTimeout(() => {
@@ -420,6 +438,8 @@ function resetToCenter() {
 }
 
 function startPlay() {
+    console.log('startPlay called');
+
     // Give ball initial velocity - more vertical to prevent center scoring
     ball.vx = (Math.random() - 0.5) * 2; // Small horizontal movement
     ball.vy = (Math.random() > 0.5 ? 1 : -1) * (Math.random() * 3 + 2); // Strong vertical movement
@@ -437,6 +457,10 @@ function startPlay() {
 
     gameRunning = true;
     gameStarted = true;
+    console.log('Game started, gameRunning:', gameRunning);
+
+    // Immediately sync overlay to show markets as suspended
+    syncOverlayWithGameState();
 }
 
 /* --- 3. GAME LOGIC & HELPER FUNCTIONS --- */
@@ -445,12 +469,12 @@ function startPlay() {
 function enableSimulationMode() {
     simulationMode = true;
     renderingEnabled = false;
-    
+
     // Hide canvas during simulation
     if (app && app.view) {
         app.view.style.display = 'none';
     }
-    
+
     // Hide UI elements
     document.getElementById('timer').style.display = 'none';
     document.getElementById('score').style.display = 'none';
@@ -459,12 +483,12 @@ function enableSimulationMode() {
 function disableSimulationMode() {
     simulationMode = false;
     renderingEnabled = true;
-    
+
     // Show canvas
     if (app && app.view) {
         app.view.style.display = 'block';
     }
-    
+
     // Show UI elements
     document.getElementById('timer').style.display = 'block';
     document.getElementById('score').style.display = 'block';
@@ -474,7 +498,7 @@ function showGoalCelebration(team, callback) {
     // Get current game speed
     const speedInput = document.getElementById('gameSpeed');
     const currentSpeed = speedInput ? parseFloat(speedInput.value) || 1.0 : 1.0;
-    
+
     if (autoMode || simulationMode || currentSpeed !== 1.0) {
         if (callback) callback(); // Skip popups in auto/simulation mode or when speed is not 1x
         return;
@@ -485,15 +509,17 @@ function showGoalCelebration(team, callback) {
     // Set team-specific styling
     goalPopup.className = 'goal-popup show ' + team + '-goal';
 
-    // Set the goal video
+    // Set the goal video and fallback
     if (team === 'red') {
         goalVideoSource.src = 'Video_of_Goal_Celebration_red.mp4';
-        goalImage.src = 'images/red score.png'; // Fallback image
+        // Use SVG placeholder directly instead of missing image
+        goalImage.src = 'data:image/svg+xml;base64,PHN2ZyB3aWR0aD0iMjAwIiBoZWlnaHQ9IjE1MCIgeG1sbnM9Imh0dHA6Ly93d3cudzMub3JnLzIwMDAvc3ZnIj4KICA8cmVjdCB3aWR0aD0iMTAwJSIgaGVpZ2h0PSIxMDAlIiBmaWxsPSIjZjQ0MzM2IiByeD0iMTAiLz4KICA8dGV4dCB4PSI1MCUiIHk9IjQwJSIgZm9udC1mYW1pbHk9IkFyaWFsLCBzYW5zLXNlcmlmIiBmb250LXNpemU9IjI0IiBmb250LXdlaWdodD0iYm9sZCIgZmlsbD0iI2ZmZiIgdGV4dC1hbmNob3I9Im1pZGRsZSI+UkVEIFRFQU08L3RleHQ+CiAgPHRleHQgeD0iNTAlIiB5PSI2NSUiIGZvbnQtZmFtaWx5PSJBcmlhbCwgc2Fucy1zZXJpZiIgZm9udC1zaXplPSIyOCIgZm9udC13ZWlnaHQ9ImJvbGQiIGZpbGw9IiNmZmYiIHRleHQtYW5jaG9yPSJtaWRkbGUiPkdPQUwhPC90ZXh0Pgo8L3N2Zz4K';
         goalText.textContent = 'RED TEAM SCORES!';
         console.log('Loading red team video: Video_of_Goal_Celebration_red.mp4');
     } else {
         goalVideoSource.src = 'Video_of_Goal_Celebrations_blue.mp4';
-        goalImage.src = 'images/blue score.png'; // Fallback image
+        // Use SVG placeholder directly instead of missing image
+        goalImage.src = 'data:image/svg+xml;base64,PHN2ZyB3aWR0aD0iMjAwIiBoZWlnaHQ9IjE1MCIgeG1sbnM9Imh0dHA6Ly93d3cudzMub3JnLzIwMDAvc3ZnIj4KICA8cmVjdCB3aWR0aD0iMTAwJSIgaGVpZ2h0PSIxMDAlIiBmaWxsPSIjMjE5NmYzIiByeD0iMTAiLz4KICA8dGV4dCB4PSI1MCUiIHk9IjQwJSIgZm9udC1mYW1pbHk9IkFyaWFsLCBzYW5zLXNlcmlmIiBmb250LXNpemU9IjI0IiBmb250LXdlaWdodD0iYm9sZCIgZmlsbD0iI2ZmZiIgdGV4dC1hbmNob3I9Im1pZGRsZSI+Qkx1RSBURU1NPC90ZXh0PgogIDx0ZXh0IHg9IjUwJSIgeT0iNjUlIiBmb250LWZhbWlseT0iQXJpYWwsIHNhbnMtc2VyaWYiIGZvbnQtc2l6ZT0iMjgiIGZvbnQtd2VpZ2h0PSJib2xkIiBmaWxsPSIjZmZmIiB0ZXh0LWFuY2hvcj0ibWlkZGxlIj5HT0FMITwvdGV4dD4KPC9zdmc+Cg==';
         goalText.textContent = 'BLUE TEAM SCORES!';
         console.log('Loading blue team video: Video_of_Goal_Celebrations_blue.mp4');
     }
@@ -506,9 +532,9 @@ function showGoalCelebration(team, callback) {
 
     // Reload video with new source
     goalVideo.load();
-    
+
     // Handle video events
-    goalVideo.onended = function() {
+    goalVideo.onended = function () {
         console.log('Video finished playing');
         // Hide popup after video ends
         goalPopup.classList.remove('show');
@@ -518,7 +544,7 @@ function showGoalCelebration(team, callback) {
         goalVideo.style.display = 'block';
         goalImage.style.display = 'none';
         goalVideo.setAttribute('loop', ''); // Restore loop for next time
-        
+
         // Call callback to continue game
         if (callback) callback();
     };
@@ -528,7 +554,7 @@ function showGoalCelebration(team, callback) {
         console.log('Video failed to play:', error);
         goalVideo.style.display = 'none';
         goalImage.style.display = 'block';
-        
+
         setTimeout(() => {
             goalPopup.classList.remove('show');
             goalVideo.style.display = 'block';
@@ -542,7 +568,7 @@ function showGoalCelebration(team, callback) {
         console.log('Video failed to load');
         goalVideo.style.display = 'none';
         goalImage.style.display = 'block';
-        
+
         setTimeout(() => {
             goalPopup.classList.remove('show');
             goalVideo.style.display = 'block';
@@ -551,10 +577,7 @@ function showGoalCelebration(team, callback) {
         }, 3000);
     };
 
-    // Handle image load error (fallback to placeholder)
-    goalImage.onerror = function () {
-        this.src = 'data:image/svg+xml;base64,PHN2ZyB3aWR0aD0iMTUwIiBoZWlnaHQ9IjE1MCIgeG1sbnM9Imh0dHA6Ly93d3cudzMub3JnLzIwMDAvc3ZnIj4KICA8cmVjdCB3aWR0aD0iMTAwJSIgaGVpZ2h0PSIxMDAlIiBmaWxsPSIjNDQ0Ii8+CiAgPHRleHQgeD0iNTAlIiB5PSI1MCUiIGZvbnQtZmFtaWx5PSJBcmlhbCIgZm9udC1zaXplPSIyMCIgZmlsbD0iI2ZmZiIgdGV4dC1hbmNob3I9Im1pZGRsZSIgZHk9Ii4zZW0iPkdPQUwhPC90ZXh0Pgo8L3N2Zz4K';
-    };
+    // No need for image error handler since we're using embedded SVG
 }
 
 // Check if a position is inside the left goal box (6-yard box)
@@ -588,11 +611,11 @@ function enforceGoalBoxRestriction(player) {
 
 function updateTimer(elapsedMS) {
     if (!gameRunning) return;
-    
+
     // Get current game speed and apply it to timer
     const speedInput = document.getElementById('gameSpeed');
     const gameSpeed = speedInput ? parseFloat(speedInput.value) || 1.0 : 1.0;
-    
+
     // Use a fixed time step (16.67ms for 60fps) and scale by game speed
     const baseTimeStep = 16.67; // milliseconds per frame at 60fps
     timer += (baseTimeStep / 1000.0) * gameSpeed;
@@ -619,16 +642,20 @@ function updateTimer(elapsedMS) {
     } else if (gameHalf === 2 && timer >= halftimeSeconds * 2 + injuryTime.second) {
         // Game Over
         gameRunning = false;
+        gameStarted = false;
         finishMatch();
-        if (autoMode && currentMatchNumber < totalMatches) {
+
+        if (autoMode && currentMatchNumber < totalMatches && !matchTransitioning) {
             setTimeout(() => startNextMatch(), 1000);
         } else if (autoMode && currentMatchNumber >= totalMatches) {
             showGameMessage(`ALL MATCHES COMPLETE!\n${totalMatches} matches played`, 5000);
             document.getElementById('downloadCSV').style.display = 'inline-block';
             document.getElementById('startMatches').disabled = false;
             autoMode = false;
-        } else {
-            showGameMessage(`FULL TIME!\nRed ${score.red} - ${score.blue} Blue`, 5000);
+        } else if (!autoMode) {
+            showGameMessage(`FULL TIME!\nRed ${score.red} - ${score.blue} Blue`, 3000);
+            // Start next match with betting after showing final score
+            setTimeout(() => startNextMatch(), 3000);
         }
     }
 
@@ -647,12 +674,26 @@ function updateTimer(elapsedMS) {
     }
 
     timerDisplay.textContent = displayText;
+
+    // Update overlay timer as well
+    const overlayTimer = document.getElementById('gameTimer');
+    if (overlayTimer) {
+        overlayTimer.textContent = displayText;
+    }
 }
 
 function updateScore() {
-    scoreDisplay.innerHTML = `
+    const scoreHTML = `
         <span class="team-red">Red: ${score.red}</span> - 
         <span class="team-blue">Blue: ${score.blue}</span>`;
+
+    scoreDisplay.innerHTML = scoreHTML;
+
+    // Update overlay score as well
+    const overlayScore = document.getElementById('gameScore');
+    if (overlayScore) {
+        overlayScore.innerHTML = scoreHTML;
+    }
 }
 
 // Simple Circle-to-Circle collision detection
@@ -724,7 +765,7 @@ function updatePlayers(deltaTime = 1) {
     // Get current game speed for consistent scaling
     const speedInput = document.getElementById('gameSpeed');
     const gameSpeed = speedInput ? parseFloat(speedInput.value) || 1.0 : 1.0;
-    
+
     for (const player of players) {
         if (player.isGoalkeeper) {
             // Goalkeeper logic - constantly move up and down within goal area
@@ -796,21 +837,21 @@ function updateBall(deltaTime = 1) {
     // Get current game speed for consistent scaling
     const speedInput = document.getElementById('gameSpeed');
     const gameSpeed = speedInput ? parseFloat(speedInput.value) || 1.0 : 1.0;
-    
+
     // Apply velocity scaled by game speed (using fixed time step approach)
     const timeStep = gameSpeed; // Scale movement by game speed
     ball.x += ball.vx * timeStep;
     ball.y += ball.vy * timeStep;
-    
+
     // Apply very light friction (scaled by game speed)
     const frictionRate = Math.pow(0.995, gameSpeed); // Friction scales with speed
     ball.vx *= frictionRate;
     ball.vy *= frictionRate;
-    
+
     // Ensure ball maintains minimum movement
     const currentSpeed = Math.sqrt(ball.vx * ball.vx + ball.vy * ball.vy);
     const minSpeed = 0.5; // Minimum speed to keep ball moving
-    
+
     if (currentSpeed < minSpeed && currentSpeed > 0) {
         // Scale up velocity to maintain minimum speed
         const factor = minSpeed / currentSpeed;
@@ -840,7 +881,7 @@ function updateBall(deltaTime = 1) {
             logGoal('blue');
             updateScore();
             gameRunning = false;
-            
+
             if (!autoMode) {
                 showGameMessage(`GOAL!\nBlue Team Scores!\n${score.red} - ${score.blue}`, 2000);
                 showGoalCelebration('blue', () => {
@@ -862,7 +903,7 @@ function updateBall(deltaTime = 1) {
             logGoal('red');
             updateScore();
             gameRunning = false;
-            
+
             if (!autoMode) {
                 showGameMessage(`GOAL!\nRed Team Scores!\n${score.red} - ${score.blue}`, 2000);
                 showGoalCelebration('red', () => {
@@ -907,28 +948,54 @@ function checkAllCollisions() {
 
 /* --- 5. INITIALIZE AND RUN GAME --- */
 
+// Game loop function - defined once to avoid multiple instances
+let gameLoopFunction = null;
+
 function initGame() {
+    console.log('Initializing game...');
+
+    // Clean up any existing game objects first
+    if (app.stage.children.length > 0) {
+        cleanupGameObjects();
+    }
+
+    console.log('Creating field...');
     createField();
+    console.log('Creating players...');
     createAllPlayers();
+    console.log('Creating ball...');
     createBall();
+    console.log('Creating game message...');
     createGameMessage();
+    console.log('Updating score...');
     updateScore(); // Initial score display
 
-    // Start the game loop
-    app.ticker.add(() => {
-        if (gameRunning) {
-            // Use deltaTime directly from ticker (already normalized and speed-adjusted)
-            const deltaTime = app.ticker.deltaTime;
-            updateTimer(app.ticker.elapsedMS);
-            updatePlayers(deltaTime);
-            updateBall(deltaTime);
-            checkAllCollisions();
-        }
-    });
+    // Only add the game loop once
+    if (!gameLoopFunction) {
+        gameLoopFunction = () => {
+            if (gameRunning) {
+                // Use deltaTime directly from ticker (already normalized and speed-adjusted)
+                const deltaTime = app.ticker.deltaTime;
+                updateTimer(app.ticker.elapsedMS);
+                updatePlayers(deltaTime);
+                updateBall(deltaTime);
+                checkAllCollisions();
+            }
 
-    // Show initial message and start the game
-    showGameMessage("KICK OFF!\nGame Starting...", 1000);
-    setTimeout(() => startPlay(), 1000);
+            // Sync overlay with game state every frame
+            syncOverlayWithGameState();
+        };
+
+        app.ticker.add(gameLoopFunction);
+        console.log('Game loop started');
+    }
+
+    // Initialize overlay status
+    initializeOverlayStatus();
+
+    // Don't start the game immediately - let betting system initialize first
+    showGameMessage("MATCH READY!\nWaiting for bets...", 3000);
+    console.log('Game initialized, waiting for betting system...');
 }
 
 /* --- 5.5. FAST SIMULATION SYSTEM --- */
@@ -951,35 +1018,35 @@ function waitForMatchCompletion() {
 // Game-based simulation using formation analysis
 async function simulateMatchFast(homeFormation, awayFormation, matchCount = 1) {
     const results = [];
-    
+
     console.log(`Starting simulation of ${matchCount} matches using game-based logic`);
-    
+
     for (let i = 0; i < matchCount; i++) {
         // Analyze formations using game data
         const homeFormationData = formations[homeFormation];
         const awayFormationData = formations[awayFormation];
-        
+
         if (!homeFormationData || !awayFormationData) {
             console.error(`Formation not found: ${homeFormation} or ${awayFormation}`);
             continue;
         }
-        
+
         // Calculate formation strengths based on player positioning
         const homeAttackStrength = calculateAttackStrength(homeFormationData);
         const homeDefenseStrength = calculateDefenseStrength(homeFormationData);
         const awayAttackStrength = calculateAttackStrength(awayFormationData);
         const awayDefenseStrength = calculateDefenseStrength(awayFormationData);
-        
+
         // Simulate match based on formation matchup
         const homeGoalChance = (homeAttackStrength / awayDefenseStrength) * 0.15; // Base 15% per attack
         const awayGoalChance = (awayAttackStrength / homeDefenseStrength) * 0.15;
-        
+
         // Simulate 90 minutes of play (simplified)
         let homeGoals = 0;
         let awayGoals = 0;
         let homeGoalsH1 = 0;
         let awayGoalsH1 = 0;
-        
+
         // First half (45 minutes)
         for (let minute = 1; minute <= 45; minute++) {
             if (Math.random() < homeGoalChance / 45) {
@@ -991,11 +1058,11 @@ async function simulateMatchFast(homeFormation, awayFormation, matchCount = 1) {
                 awayGoalsH1++;
             }
         }
-        
+
         // Second half (45 minutes)
         const homeGoalsH2 = homeGoals - homeGoalsH1;
         const awayGoalsH2 = awayGoals - awayGoalsH1;
-        
+
         for (let minute = 46; minute <= 90; minute++) {
             if (Math.random() < homeGoalChance / 45) {
                 homeGoals++;
@@ -1004,10 +1071,10 @@ async function simulateMatchFast(homeFormation, awayFormation, matchCount = 1) {
                 awayGoals++;
             }
         }
-        
+
         const finalHomeGoalsH2 = homeGoals - homeGoalsH1;
         const finalAwayGoalsH2 = awayGoals - awayGoalsH1;
-        
+
         // Store result
         results.push({
             homeFormation,
@@ -1020,8 +1087,8 @@ async function simulateMatchFast(homeFormation, awayFormation, matchCount = 1) {
             awayGoalsH2: finalAwayGoalsH2,
             totalGoals: homeGoals + awayGoals,
             btts: homeGoals > 0 && awayGoals > 0,
-            winner: homeGoals > awayGoals ? 'home' : 
-                   awayGoals > homeGoals ? 'away' : 'draw',
+            winner: homeGoals > awayGoals ? 'home' :
+                awayGoals > homeGoals ? 'away' : 'draw',
             matchData: {
                 homeFormation,
                 awayFormation,
@@ -1031,17 +1098,17 @@ async function simulateMatchFast(homeFormation, awayFormation, matchCount = 1) {
                 firstHalfAwayGoals: awayGoalsH1,
                 secondHalfHomeGoals: finalHomeGoalsH2,
                 secondHalfAwayGoals: finalAwayGoalsH2,
-                result: homeGoals > awayGoals ? 'Home Win' : 
-                       awayGoals > homeGoals ? 'Away Win' : 'Draw'
+                result: homeGoals > awayGoals ? 'Home Win' :
+                    awayGoals > homeGoals ? 'Away Win' : 'Draw'
             }
         });
-        
+
         // Small delay every 10 matches to allow UI updates
         if (i % 10 === 0) {
             await new Promise(resolve => setTimeout(resolve, 1));
         }
     }
-    
+
     console.log(`Completed simulation of ${matchCount} matches`);
     return results;
 }
@@ -1050,10 +1117,10 @@ async function simulateMatchFast(homeFormation, awayFormation, matchCount = 1) {
 function calculateAttackStrength(formationData) {
     // Count forwards and attacking midfielders
     let attackStrength = 0;
-    
+
     // All forwards count as attackers
     attackStrength += formationData.forwards ? formationData.forwards.length : 0;
-    
+
     // Midfielders in attacking positions (y > 0.5) count as half attackers
     if (formationData.midfielders) {
         formationData.midfielders.forEach(player => {
@@ -1062,17 +1129,17 @@ function calculateAttackStrength(formationData) {
             }
         });
     }
-    
+
     return Math.max(attackStrength, 1); // Minimum 1 to avoid division by zero
 }
 
 function calculateDefenseStrength(formationData) {
     // Count defenders and defensive midfielders
     let defenseStrength = 0;
-    
+
     // All defenders count as defenders
     defenseStrength += formationData.defenders ? formationData.defenders.length : 0;
-    
+
     // Midfielders in defensive positions (y < 0.5) count as half defenders
     if (formationData.midfielders) {
         formationData.midfielders.forEach(player => {
@@ -1081,7 +1148,7 @@ function calculateDefenseStrength(formationData) {
             }
         });
     }
-    
+
     return Math.max(defenseStrength, 1); // Minimum 1 to avoid division by zero
 }
 
@@ -1099,43 +1166,7 @@ function getFormationStrength(formation) {
 }
 
 // Generate historical data quickly
-async function generateHistoricalData(numMatches = 1000, progressCallback = null) {
-    console.log(`Generating ${numMatches} matches of historical data...`);
-    
-    const formationNames = Object.keys(formations);
-    const results = [];
-    
-    // Process in batches to avoid blocking UI
-    const batchSize = 50;
-    for (let i = 0; i < numMatches; i += batchSize) {
-        const batchCount = Math.min(batchSize, numMatches - i);
-        
-        // Random formation matchup
-        const homeFormation = formationNames[Math.floor(Math.random() * formationNames.length)];
-        const awayFormation = formationNames[Math.floor(Math.random() * formationNames.length)];
-        
-        // Simulate batch
-        const batchResults = await simulateMatchFast(homeFormation, awayFormation, batchCount);
-        results.push(...batchResults);
-        
-        // Update progress
-        const completed = i + batchCount;
-        const percentage = Math.round((completed / numMatches) * 100);
-        console.log(`Progress: ${completed}/${numMatches} matches completed (${percentage}%)`);
-        
-        // Call progress callback if provided
-        if (progressCallback) {
-            progressCallback(completed, numMatches, percentage);
-        }
-        
-        // Small delay to prevent browser freezing
-        await new Promise(resolve => setTimeout(resolve, 1));
-    }
-    
-    console.log('Historical data generation complete!');
-    localStorage.setItem('historicalData', JSON.stringify(results));
-    return results;
-}
+
 
 /* --- 6. MATCH LOGGING SYSTEM --- */
 
@@ -1212,18 +1243,93 @@ function resetMatchData() {
     injuryTime = { first: 0, second: 0 };
 }
 
+function cleanupGameObjects() {
+    console.log('Cleaning up game objects...');
+
+    // Remove all children from the stage
+    while (app.stage.children.length > 0) {
+        const child = app.stage.children[0];
+        app.stage.removeChild(child);
+        if (child.destroy) {
+            child.destroy();
+        }
+    }
+
+    // Clear arrays
+    players.length = 0;
+    ball = null;
+    gameMessage = null;
+
+    console.log('Game objects cleaned up');
+}
+
+function cleanupGameObjects() {
+    console.log('Cleaning up game objects...');
+
+    // Remove all children from the stage
+    while (app.stage.children.length > 0) {
+        const child = app.stage.children[0];
+        app.stage.removeChild(child);
+        if (child.destroy) {
+            child.destroy();
+        }
+    }
+
+    // Clear arrays
+    players.length = 0;
+    ball = null;
+    gameMessage = null;
+
+    console.log('Game objects cleaned up');
+}
+
 function startNextMatch() {
+    if (matchTransitioning) {
+        console.log('Match transition already in progress, skipping...');
+        return;
+    }
+
+    matchTransitioning = true;
+    console.log(`Starting match ${currentMatchNumber + 1}...`);
+
+    // Stop the current game
+    gameRunning = false;
+    gameStarted = false;
+
+    // Clean up existing game objects
+    cleanupGameObjects();
+
+    // Increment match number and reset data
     currentMatchNumber++;
     resetMatchData();
 
-    // Set formations before resetting positions
+    // Set formations before creating new objects
     currentMatch.homeFormation = getRandomFormation();
     currentMatch.awayFormation = getRandomFormation();
     console.log(`Match ${currentMatchNumber}: Red (${currentMatch.homeFormation}) vs Blue (${currentMatch.awayFormation})`);
 
-    resetToCenter();
+    // Recreate all game objects
+    console.log('Recreating game objects...');
+    createField();
+    createAllPlayers();
+    createBall();
+    createGameMessage();
+
+    // Update displays
     updateScore();
-    setTimeout(() => startPlay(), 500);
+
+    // Start betting window for the new match
+    showGameMessage("NEW MATCH!\nBetting is open...", 3000);
+
+    // Start betting timer (20 seconds)
+    if (typeof startBettingTimer === 'function') {
+        startBettingTimer(20);
+        if (typeof showBetMessage === 'function') {
+            showBetMessage('New match starting! Place your bets now!', 'info');
+        }
+    }
+
+    matchTransitioning = false; // Allow next transition
 }
 
 function generateCSV() {
@@ -1283,55 +1389,7 @@ function downloadCSV() {
     window.URL.revokeObjectURL(url);
 }
 
-function generateHistoricalCSV() {
-    const historicalData = JSON.parse(localStorage.getItem('historicalData') || '[]');
-    
-    if (historicalData.length === 0) {
-        alert('No historical data available. Please generate historical data first.');
-        return '';
-    }
 
-    const headers = [
-        'Match Number', 'Home Goals', 'Away Goals', 'Home Goals H1', 'Away Goals H1',
-        'Home Goals H2', 'Away Goals H2', 'Total Goals', 'BTTS', 'Winner', 'Result'
-    ];
-
-    let csv = headers.join(',') + '\n';
-
-    historicalData.forEach((match, index) => {
-        const row = [
-            index + 1,
-            match.homeGoals,
-            match.awayGoals,
-            match.homeGoalsH1 || 0,
-            match.awayGoalsH1 || 0,
-            match.homeGoalsH2 || 0,
-            match.awayGoalsH2 || 0,
-            match.totalGoals,
-            match.btts ? 'Yes' : 'No',
-            match.winner,
-            match.matchData.result
-        ];
-        csv += row.join(',') + '\n';
-    });
-
-    return csv;
-}
-
-function downloadHistoricalCSV() {
-    const csv = generateHistoricalCSV();
-    if (!csv) return; // No data available
-    
-    const blob = new Blob([csv], { type: 'text/csv' });
-    const url = window.URL.createObjectURL(blob);
-    const a = document.createElement('a');
-    a.href = url;
-    a.download = `historical_soccer_data_${new Date().toISOString().split('T')[0]}.csv`;
-    document.body.appendChild(a);
-    a.click();
-    document.body.removeChild(a);
-    window.URL.revokeObjectURL(url);
-}
 
 // Event listeners for match simulation
 document.getElementById('startMatches').addEventListener('click', () => {
@@ -1365,138 +1423,25 @@ document.getElementById('startMatches').addEventListener('click', () => {
 
 document.getElementById('downloadCSV').addEventListener('click', downloadCSV);
 
-// Historical data download button
-document.getElementById('downloadHistoricalData').addEventListener('click', downloadHistoricalCSV);
 
-// Historical data generation button
-document.getElementById('generateData').addEventListener('click', async () => {
-    const button = document.getElementById('generateData');
-    const progressDiv = document.getElementById('historyProgress');
-    const progressBarContainer = document.getElementById('historyProgressBar');
-    const progressFill = document.getElementById('historyProgressFill');
-    const progressText = document.getElementById('historyProgressText');
-    const countInput = document.getElementById('historyCount');
-    
-    const numMatches = parseInt(countInput.value) || 1000;
-    
-    button.disabled = true;
-    button.textContent = 'Generating...';
-    progressDiv.textContent = 'Starting historical data generation...';
-    
-    // Show progress bar
-    progressBarContainer.style.display = 'block';
-    progressFill.style.width = '0%';
-    progressText.textContent = '0%';
-    
-    // Progress callback function
-    const updateProgress = (completed, total, percentage) => {
-        progressFill.style.width = `${percentage}%`;
-        progressText.textContent = `${percentage}% (${completed}/${total} matches)`;
-        progressDiv.textContent = `Generating matches... ${completed}/${total} completed`;
-    };
-    
-    try {
-        const historicalData = await generateHistoricalData(numMatches, updateProgress);
-        
-        // Final success state
-        progressFill.style.width = '100%';
-        progressText.textContent = '100% Complete!';
-        progressDiv.textContent = `Generated ${historicalData.length} matches! Data saved to localStorage.`;
-        button.textContent = 'Generate Historical Data';
-        
-        // Show download button
-        document.getElementById('downloadHistoricalData').style.display = 'inline-block';
-        
-        // Show some statistics
-        const stats = analyzeHistoricalData(historicalData);
-        console.log('Historical Data Statistics:', stats);
-        
-        // Hide progress bar after 3 seconds
-        setTimeout(() => {
-            progressBarContainer.style.display = 'none';
-        }, 3000);
-        
-    } catch (error) {
-        console.error('Error generating data:', error);
-        progressDiv.textContent = 'Error generating data. Check console for details.';
-        progressFill.style.width = '0%';
-        progressText.textContent = 'Error!';
-        button.textContent = 'Generate Historical Data';
-        
-        // Hide progress bar after error
-        setTimeout(() => {
-            progressBarContainer.style.display = 'none';
-        }, 3000);
-    } finally {
-        button.disabled = false;
-    }
-});
-
-// Analyze historical data for statistics
-function analyzeHistoricalData(data) {
-    const stats = {
-        totalMatches: data.length,
-        homeWins: 0,
-        draws: 0,
-        awayWins: 0,
-        totalGoals: 0,
-        bttsMatches: 0,
-        formationStats: {}
-    };
-    
-    data.forEach(match => {
-        if (match.winner === 'home') stats.homeWins++;
-        else if (match.winner === 'away') stats.awayWins++;
-        else stats.draws++;
-        
-        stats.totalGoals += match.totalGoals;
-        if (match.btts) stats.bttsMatches++;
-        
-        // Formation statistics
-        const key = `${match.homeFormation}_vs_${match.awayFormation}`;
-        if (!stats.formationStats[key]) {
-            stats.formationStats[key] = { matches: 0, homeWins: 0, draws: 0, awayWins: 0 };
-        }
-        stats.formationStats[key].matches++;
-        if (match.winner === 'home') stats.formationStats[key].homeWins++;
-        else if (match.winner === 'away') stats.formationStats[key].awayWins++;
-        else stats.formationStats[key].draws++;
-    });
-    
-    stats.homeWinRate = (stats.homeWins / stats.totalMatches * 100).toFixed(1) + '%';
-    stats.drawRate = (stats.draws / stats.totalMatches * 100).toFixed(1) + '%';
-    stats.awayWinRate = (stats.awayWins / stats.totalMatches * 100).toFixed(1) + '%';
-    stats.avgGoalsPerMatch = (stats.totalGoals / stats.totalMatches).toFixed(2);
-    stats.bttsRate = (stats.bttsMatches / stats.totalMatches * 100).toFixed(1) + '%';
-    
-    return stats;
-}
-
-// Check for existing historical data and show download button if available
-function checkExistingHistoricalData() {
-    const historicalData = localStorage.getItem('historicalData');
-    if (historicalData && JSON.parse(historicalData).length > 0) {
-        document.getElementById('downloadHistoricalData').style.display = 'inline-block';
-    }
-}
 
 // Game speed control
 function updateGameSpeed() {
     const speedInput = document.getElementById('gameSpeed');
     const speedDisplay = document.getElementById('speedDisplay');
-    
+
     if (!speedInput || !speedDisplay) {
         console.error('Speed control elements not found');
         return;
     }
-    
+
     const speed = parseFloat(speedInput.value) || 1.0;
     const clampedSpeed = Math.max(0.1, Math.min(50, speed)); // Clamp between 0.1 and 50
-    
+
     if (app && app.ticker) {
         // Set ticker speed to match desired game speed
         app.ticker.speed = clampedSpeed;
-        
+
         speedDisplay.textContent = `Speed: ${clampedSpeed.toFixed(1)}x`;
         console.log(`Game speed set to: ${clampedSpeed}x`);
     } else {
@@ -1509,15 +1454,15 @@ function initSpeedControl() {
     const speedInput = document.getElementById('gameSpeed');
     const speedDisplay = document.getElementById('speedDisplay');
     const testButton = document.getElementById('testSpeed');
-    
+
     if (speedInput && speedDisplay) {
         // Set initial speed display
         updateGameSpeed();
-        
+
         // Add event listeners
         speedInput.addEventListener('input', updateGameSpeed);
         speedInput.addEventListener('change', updateGameSpeed);
-        
+
         // Test button functionality
         if (testButton) {
             testButton.addEventListener('click', () => {
@@ -1526,20 +1471,1196 @@ function initSpeedControl() {
                 testButton.textContent = speedInput.value === '5' ? 'Test 1x Speed' : 'Test 5x Speed';
             });
         }
-        
+
         console.log('Speed control initialized');
     } else {
         console.error('Speed control elements not found during initialization');
     }
 }
 
-// Start the game
-initGame();
+// Start the game when DOM is ready
+function startGameWhenReady() {
+    console.log('Starting game initialization...');
+    console.log('PIXI available:', typeof PIXI !== 'undefined');
+    console.log('App created:', !!app);
+    console.log('App view:', !!app?.view);
+    console.log('DOM ready state:', document.readyState);
+
+    try {
+        initGame();
+        console.log('Game initialized successfully, gameRunning:', gameRunning);
+    } catch (error) {
+        console.error('Error initializing game:', error);
+    }
+}
+
+// Ensure DOM is ready before starting game
+if (document.readyState === 'loading') {
+    document.addEventListener('DOMContentLoaded', startGameWhenReady);
+} else {
+    startGameWhenReady();
+}
 
 // Initialize speed control after game is ready
 setTimeout(() => {
     initSpeedControl();
 }, 100);
 
-// Check for existing data on page load
-checkExistingHistoricalData();
+// Manual function to start a new match with betting (for testing)
+function startNewMatchWithBetting() {
+    console.log('Starting new match with betting...');
+
+    // Reset game state
+    gameRunning = false;
+    gameStarted = false;
+    matchTransitioning = false;
+
+    // Reset match data
+    resetMatchData();
+
+    // Set formations
+    currentMatch.homeFormation = getRandomFormation();
+    currentMatch.awayFormation = getRandomFormation();
+
+    // Update displays
+    updateScore();
+
+    // Start betting window
+    if (typeof startBettingTimer === 'function') {
+        startBettingTimer(20);
+        if (typeof showBetMessage === 'function') {
+            showBetMessage('New match! Betting window is open - place your bets!', 'info');
+        }
+    }
+
+    showGameMessage("NEW MATCH!\nBetting is open...", 3000);
+}
+
+// Debug function to check system status
+function debugBettingSystem() {
+    console.log('=== BETTING SYSTEM DEBUG ===');
+    console.log('bettingWindowOpen:', bettingWindowOpen);
+    console.log('bettingTimeLeft:', bettingTimeLeft);
+    console.log('bettingTimer:', bettingTimer);
+    console.log('marketsLocked:', marketsLocked);
+    console.log('gameRunning:', gameRunning);
+    console.log('gameStarted:', gameStarted);
+    console.log('autoMode:', autoMode);
+
+    // Check if key elements exist
+    const bettingTimer = document.getElementById('bettingTimer');
+    const bettingStatus = document.getElementById('bettingStatus');
+    const betMessage = document.getElementById('betMessage');
+    const bettingMarkets = document.getElementById('bettingMarkets');
+
+    console.log('bettingTimer element:', bettingTimer);
+    console.log('bettingStatus element:', bettingStatus);
+    console.log('betMessage element:', betMessage);
+    console.log('bettingMarkets element:', bettingMarkets);
+
+    if (bettingMarkets) {
+        console.log('bettingMarkets display:', bettingMarkets.style.display);
+        console.log('bettingMarkets visibility:', bettingMarkets.style.visibility);
+        console.log('bettingMarkets classes:', bettingMarkets.className);
+    }
+
+    // Check if key functions exist
+    console.log('startBettingTimer function:', typeof startBettingTimer);
+    console.log('showBetMessage function:', typeof showBetMessage);
+    console.log('showBettingStatus function:', typeof showBettingStatus);
+    console.log('toggleBettingMarkets function:', typeof toggleBettingMarkets);
+    console.log('=== END DEBUG ===');
+}
+
+// Force show betting interface for testing
+function forceShowBetting() {
+    console.log('Force showing betting interface...');
+
+    // Reset all betting states
+    bettingWindowOpen = true;
+    marketsLocked = false;
+    bettingTimeLeft = 20;
+
+    const bettingMarkets = document.getElementById('bettingMarkets');
+    if (bettingMarkets) {
+        bettingMarkets.style.display = 'block';
+        bettingMarkets.style.visibility = 'visible';
+        bettingMarkets.style.opacity = '1';
+        bettingMarkets.classList.remove('disabled');
+        console.log('Betting markets forced visible');
+    }
+
+    // Unlock markets
+    if (typeof unlockMarkets === 'function') {
+        unlockMarkets();
+    }
+
+    showBettingStatus('open');
+    toggleBettingMarkets(true);
+
+    const timerContainer = document.getElementById('bettingTimerContainer');
+    if (timerContainer) {
+        timerContainer.style.display = 'block';
+        console.log('Timer container shown');
+    }
+
+    console.log('Betting interface force-shown with all states reset');
+}
+
+// Force reset betting state
+function resetBettingState() {
+    console.log('Resetting betting state...');
+
+    // Reset all variables
+    bettingWindowOpen = false;
+    marketsLocked = false;
+    bettingTimeLeft = 0;
+
+    if (bettingTimer) {
+        clearInterval(bettingTimer);
+        bettingTimer = null;
+    }
+
+    // Reset game states that might interfere
+    gameRunning = false;
+    // Don't reset gameStarted as it might be needed for other logic
+
+    console.log('Betting state reset complete');
+}
+
+// Make debug function globally available
+window.debugBettingSystem = debugBettingSystem;
+window.startNewMatchWithBetting = startNewMatchWithBetting;
+window.forceShowBetting = forceShowBetting;
+window.resetBettingState = resetBettingState;
+
+/* --- BETTING DASHBOARD FUNCTIONALITY --- */
+
+// Historical data from 1000 simulations
+const historicalStats = {
+    homeWins: 343,
+    draws: 288,
+    awayWins: 369,
+    totalMatches: 1000,
+    homeGoals: {
+        0: 298, 1: 395, 2: 218, 3: 67, 4: 18, 5: 3, 6: 1
+    },
+    awayGoals: {
+        0: 289, 1: 380, 2: 204, 3: 98, 4: 22, 5: 6, 6: 1
+    },
+    firstHalfHome: {
+        0: 575, 1: 330, 2: 81, 3: 13, 4: 1
+    },
+    firstHalfAway: {
+        0: 539, 1: 357, 2: 82, 3: 16, 4: 6
+    },
+    avgHomeGoals: 1.125,
+    avgAwayGoals: 1.206,
+    avgFirstHalfHome: 0.535,
+    avgFirstHalfAway: 0.593
+};
+
+// Calculate betting odds based on probabilities
+function calculateOdds(probability, margin = 0.05) {
+    // Add bookmaker margin and convert to decimal odds
+    const adjustedProb = probability * (1 + margin);
+    return Math.max(1.01, 1 / adjustedProb);
+}
+
+// Update betting odds display
+function updateBettingOdds() {
+    const stats = historicalStats;
+    const total = stats.totalMatches;
+
+    // 1X2 Market
+    const homeWinProb = stats.homeWins / total;
+    const drawProb = stats.draws / total;
+    const awayWinProb = stats.awayWins / total;
+
+    const redWinOddEl = document.getElementById('redWinOdd');
+    const drawOddEl = document.getElementById('drawOdd');
+    const blueWinOddEl = document.getElementById('blueWinOdd');
+
+    if (redWinOddEl) redWinOddEl.textContent = calculateOdds(homeWinProb).toFixed(2);
+    if (drawOddEl) drawOddEl.textContent = calculateOdds(drawProb).toFixed(2);
+    if (blueWinOddEl) blueWinOddEl.textContent = calculateOdds(awayWinProb).toFixed(2);
+
+    // Total Goals Market (Over/Under 2.5)
+    let over25Count = 0;
+    for (let homeGoals = 0; homeGoals <= 6; homeGoals++) {
+        for (let awayGoals = 0; awayGoals <= 6; awayGoals++) {
+            if (homeGoals + awayGoals > 2.5) {
+                const homeProb = (stats.homeGoals[homeGoals] || 0) / total;
+                const awayProb = (stats.awayGoals[awayGoals] || 0) / total;
+                over25Count += homeProb * awayProb * total;
+            }
+        }
+    }
+
+    const over25Prob = over25Count / total;
+    const under25Prob = 1 - over25Prob;
+
+    const over25OddEl = document.getElementById('over25Odd');
+    const under25OddEl = document.getElementById('under25Odd');
+    if (over25OddEl) over25OddEl.textContent = calculateOdds(over25Prob).toFixed(2);
+    if (under25OddEl) under25OddEl.textContent = calculateOdds(under25Prob).toFixed(2);
+
+    // Both Teams To Score
+    const homeScoreProb = 1 - (stats.homeGoals[0] / total);
+    const awayScoreProb = 1 - (stats.awayGoals[0] / total);
+    const bttsYesProb = homeScoreProb * awayScoreProb;
+    const bttsNoProb = 1 - bttsYesProb;
+
+    const bttsYesOddEl = document.getElementById('bttsYesOdd');
+    const bttsNoOddEl = document.getElementById('bttsNoOdd');
+    if (bttsYesOddEl) bttsYesOddEl.textContent = calculateOdds(bttsYesProb).toFixed(2);
+    if (bttsNoOddEl) bttsNoOddEl.textContent = calculateOdds(bttsNoProb).toFixed(2);
+
+    // First Half Goals (Over/Under 0.5)
+    const fhHomeScoreProb = 1 - (stats.firstHalfHome[0] / total);
+    const fhAwayScoreProb = 1 - (stats.firstHalfAway[0] / total);
+    const fhOver05Prob = 1 - ((stats.firstHalfHome[0] / total) * (stats.firstHalfAway[0] / total));
+    const fhUnder05Prob = 1 - fhOver05Prob;
+
+    const fhOver05OddEl = document.getElementById('fhOver05Odd');
+    const fhUnder05OddEl = document.getElementById('fhUnder05Odd');
+    if (fhOver05OddEl) fhOver05OddEl.textContent = calculateOdds(fhOver05Prob).toFixed(2);
+    if (fhUnder05OddEl) fhUnder05OddEl.textContent = calculateOdds(fhUnder05Prob).toFixed(2);
+}
+
+// Countdown timer between matches
+let countdownInterval;
+let countdownSeconds = 0;
+
+function startMatchCountdown(seconds = 20) {
+    countdownSeconds = seconds;
+    const countdownElement = document.getElementById('matchCountdown');
+
+    countdownInterval = setInterval(() => {
+        if (countdownSeconds > 0) {
+            countdownElement.textContent = `Next match in: ${countdownSeconds}s`;
+            countdownSeconds--;
+        } else {
+            countdownElement.textContent = 'Match starting...';
+            clearInterval(countdownInterval);
+        }
+    }, 1000);
+}
+
+function stopMatchCountdown() {
+    if (countdownInterval) {
+        clearInterval(countdownInterval);
+        countdownInterval = null;
+    }
+    document.getElementById('matchCountdown').textContent = 'Match in progress...';
+}
+
+// Add betting odds animation
+function animateOddsChange() {
+    const oddElements = document.querySelectorAll('.odd');
+    oddElements.forEach(element => {
+        element.style.transform = 'scale(1.1)';
+        element.style.color = '#ff6b6b';
+        setTimeout(() => {
+            element.style.transform = 'scale(1)';
+            element.style.color = '#ffd700';
+        }, 300);
+    });
+}
+
+// Betting system variables
+let userBalance = 1000.00;
+let activeBets = [];
+let currentBet = null;
+let marketsLocked = false;
+let bettingTimer = null;
+let bettingTimeLeft = 0;
+let bettingWindowOpen = true;
+
+// Balance and market functions are defined in the enhanced betting system below
+
+// Betting functions are handled in the enhanced betting system below
+
+// Initialize betting dashboard
+function initBettingDashboard() {
+    updateBettingOdds();
+    updateBalanceDisplay();
+
+    // Add click handlers for betting odds
+    document.querySelectorAll('.odd-item').forEach(item => {
+        item.addEventListener('click', function () {
+            const market = this.dataset.market;
+            const outcome = this.dataset.outcome;
+            const odd = this.dataset.odd;
+
+            // This functionality is handled by handleOddsClick
+            // selectBet(market, this.querySelector('.outcome').textContent, odd);
+
+            // Add visual feedback
+            document.querySelectorAll('.odd-item').forEach(el => el.classList.remove('selected'));
+            this.classList.add('selected');
+        });
+    });
+
+    // Bet amount input handler
+    document.getElementById('betAmount').addEventListener('input', updatePotentialWin);
+
+    // Place bet button
+    document.getElementById('placeBet').addEventListener('click', placeBet);
+
+    // Clear bet button
+    document.getElementById('clearBet').addEventListener('click', clearBet);
+}
+
+// Betting dashboard initialization is now handled in the enhanced DOM initialization above
+
+/* --- ENHANCED BETTING SYSTEM --- */
+
+// Remove duplicate betting variables (already declared above)
+// Merge betting functionality
+
+// Update balance display
+function updateBalanceDisplay() {
+    const balanceElement = document.getElementById('userBalance');
+    if (balanceElement) {
+        balanceElement.textContent = `$${userBalance.toFixed(2)}`;
+    }
+}
+
+// Enhanced betting system initialization
+function initializeBetting() {
+    console.log('Initializing betting system...');
+    updateBalanceDisplay();
+    setupBettingEventListeners();
+    updateBetslip();
+    updateBettingOdds(); // Also update odds
+
+    // Ensure betting markets are visible and enabled by default
+    const marketsElement = document.getElementById('bettingMarkets');
+    if (marketsElement) {
+        console.log('Setting up betting markets visibility...');
+        marketsElement.style.display = 'block';
+        marketsElement.style.visibility = 'visible';
+        marketsElement.classList.remove('disabled');
+    }
+
+    console.log('Betting system initialized');
+}
+
+// Setup event listeners for betting
+function setupBettingEventListeners() {
+    // Odds button clicks
+    document.querySelectorAll('.odds-btn').forEach(btn => {
+        btn.removeEventListener('click', handleOddsClick); // Remove existing listeners
+        btn.addEventListener('click', handleOddsClick);
+    });
+
+    // Bet amount input
+    const betAmountInput = document.getElementById('betAmount');
+    if (betAmountInput) {
+        betAmountInput.removeEventListener('input', updatePotentialWin);
+        betAmountInput.addEventListener('input', updatePotentialWin);
+    }
+
+    // Place bet button
+    const placeBetBtn = document.getElementById('placeBet');
+    if (placeBetBtn) {
+        placeBetBtn.removeEventListener('click', placeBet);
+        placeBetBtn.addEventListener('click', placeBet);
+    }
+
+    // Clear bet button
+    const clearBetBtn = document.getElementById('clearBet');
+    if (clearBetBtn) {
+        clearBetBtn.removeEventListener('click', clearBet);
+        clearBetBtn.addEventListener('click', clearBet);
+    }
+}
+
+// Handle odds button click
+function handleOddsClick(event) {
+    if (marketsLocked) {
+        showBetMessage('Markets are currently suspended during live play', 'warning');
+        return;
+    }
+
+    const btn = event.currentTarget;
+    const market = btn.dataset.market;
+    const outcome = btn.dataset.outcome;
+    const odds = parseFloat(btn.dataset.odd);
+
+    // Clear previous selection
+    document.querySelectorAll('.odds-btn').forEach(b => b.classList.remove('selected'));
+
+    // Select current button
+    btn.classList.add('selected');
+
+    // Create bet object
+    currentBet = {
+        market: market,
+        outcome: outcome,
+        odds: odds,
+        selection: btn.querySelector('.selection-name')?.textContent || btn.querySelector('.selection')?.textContent,
+        marketName: getMarketDisplayName(market)
+    };
+
+    updateBetslip();
+}
+
+// Get display name for market
+function getMarketDisplayName(market) {
+    const marketNames = {
+        '1x2': 'Match Winner',
+        'total-goals': 'Total Goals',
+        'btts': 'Both Teams to Score',
+        'fh-goals': 'First Half Goals',
+        'specials': 'Match Specials'
+    };
+    return marketNames[market] || market;
+}
+
+// Update betslip display
+function updateBetslip() {
+    const emptyBetslip = document.getElementById('emptyBetslip');
+    const betslipContent = document.getElementById('betslipContent');
+
+    if (!emptyBetslip || !betslipContent) return;
+
+    if (!currentBet) {
+        emptyBetslip.style.display = 'block';
+        betslipContent.style.display = 'none';
+        return;
+    }
+
+    emptyBetslip.style.display = 'none';
+    betslipContent.style.display = 'block';
+
+    // Update bet details
+    const betMarketNameEl = document.getElementById('betMarketName');
+    const betSelectionNameEl = document.getElementById('betSelectionName');
+    const betOddsEl = document.getElementById('betOdds');
+
+    if (betMarketNameEl) betMarketNameEl.textContent = currentBet.marketName;
+    if (betSelectionNameEl) betSelectionNameEl.textContent = currentBet.selection;
+    if (betOddsEl) betOddsEl.textContent = currentBet.odds.toFixed(2);
+
+    // Update potential win
+    updatePotentialWin();
+}
+
+// Update potential win calculation
+function updatePotentialWin() {
+    const betAmount = parseFloat(document.getElementById('betAmount').value) || 0;
+    const potentialWinSpan = document.getElementById('potentialWin');
+
+    if (currentBet && betAmount > 0) {
+        const potentialWin = (betAmount * currentBet.odds) - betAmount;
+        potentialWinSpan.textContent = potentialWin.toFixed(2);
+    } else {
+        potentialWinSpan.textContent = '0.00';
+    }
+}
+
+// Place bet
+function placeBet() {
+    if (!currentBet) {
+        showBetMessage('Please select a bet first', 'error');
+        return;
+    }
+
+    const betAmount = parseFloat(document.getElementById('betAmount').value);
+
+    if (!betAmount || betAmount <= 0) {
+        showBetMessage('Please enter a valid bet amount', 'error');
+        return;
+    }
+
+    if (betAmount > userBalance) {
+        showBetMessage('Insufficient balance', 'error');
+        return;
+    }
+
+    if (!bettingWindowOpen) {
+        showBetMessage('Betting window is closed', 'error');
+        return;
+    }
+
+    if (marketsLocked) {
+        showBetMessage('Cannot place bet - markets are suspended', 'error');
+        return;
+    }
+
+    // Deduct from balance
+    userBalance -= betAmount;
+    updateBalanceDisplay();
+
+    // Create active bet
+    const activeBet = {
+        id: Date.now(),
+        market: currentBet.market,
+        outcome: currentBet.outcome,
+        selection: currentBet.selection,
+        marketName: currentBet.marketName,
+        odds: currentBet.odds,
+        stake: betAmount,
+        potentialWin: (betAmount * currentBet.odds) - betAmount,
+        status: 'pending',
+        timestamp: new Date()
+    };
+
+    activeBets.push(activeBet);
+    updateActiveBets();
+
+    showBetMessage(`Bet placed successfully! $${betAmount.toFixed(2)} on ${currentBet.selection}`, 'success');
+
+    // Clear betslip
+    clearBet();
+}
+
+// Clear bet
+function clearBet() {
+    currentBet = null;
+    document.getElementById('betAmount').value = '';
+    document.querySelectorAll('.odds-btn').forEach(btn => btn.classList.remove('selected'));
+    updateBetslip();
+    hideBetMessage();
+}
+
+// Show bet message
+function showBetMessage(message, type) {
+    const messageDiv = document.getElementById('betMessage');
+    messageDiv.textContent = message;
+    messageDiv.className = `bet-message ${type}`;
+    messageDiv.style.display = 'block';
+
+    // Auto hide after 5 seconds
+    setTimeout(() => {
+        hideBetMessage();
+    }, 5000);
+}
+
+// Hide bet message
+function hideBetMessage() {
+    document.getElementById('betMessage').style.display = 'none';
+}
+
+// Update active bets display
+function updateActiveBets() {
+    const betsList = document.getElementById('betsList');
+
+    if (activeBets.length === 0) {
+        betsList.innerHTML = '<div class="no-bets">No active bets</div>';
+        return;
+    }
+
+    betsList.innerHTML = activeBets.map(bet => `
+        <div class="bet-item">
+            <div class="bet-details">
+                <div class="bet-market">${bet.marketName}</div>
+                <div class="bet-selection-details">${bet.selection}</div>
+                <div class="bet-stake-odds">$${bet.stake.toFixed(2)} @ ${bet.odds.toFixed(2)}</div>
+            </div>
+            <div class="bet-status ${bet.status}">${bet.status}</div>
+        </div>
+    `).join('');
+}
+
+// Lock/unlock markets
+function lockMarkets() {
+    marketsLocked = true;
+    document.querySelectorAll('.market-card').forEach(card => {
+        card.classList.add('suspended');
+    });
+    document.querySelectorAll('.odds-btn').forEach(btn => {
+        btn.classList.add('suspended');
+    });
+
+    // Update live indicator
+    const liveIndicator = document.querySelector('.live-indicator');
+    if (liveIndicator) {
+        liveIndicator.textContent = '● LIVE - SUSPENDED';
+    }
+}
+
+function unlockMarkets() {
+    marketsLocked = false;
+    document.querySelectorAll('.market-card').forEach(card => {
+        card.classList.remove('suspended');
+    });
+    document.querySelectorAll('.odds-btn').forEach(btn => {
+        btn.classList.remove('suspended');
+    });
+
+    // Update live indicator
+    const liveIndicator = document.querySelector('.live-indicator');
+    if (liveIndicator) {
+        liveIndicator.textContent = '● LIVE';
+    }
+}
+
+// Settle bets after match
+function settleBets(matchResult) {
+    // Safety check - don't settle if match is still running or no result
+    if (gameRunning || !matchResult || activeBets.length === 0) {
+        console.log('Skipping bet settlement - match still running or no bets');
+        return;
+    }
+
+    console.log('Settling bets with result:', matchResult);
+
+    activeBets.forEach(bet => {
+        if (bet.status !== 'pending') return;
+
+        let won = false;
+
+        // Check bet outcome based on match result
+        switch (bet.market) {
+            case '1x2':
+                if (bet.outcome === 'red-win' && matchResult.winner === 'red') won = true;
+                if (bet.outcome === 'blue-win' && matchResult.winner === 'blue') won = true;
+                if (bet.outcome === 'draw' && matchResult.winner === 'draw') won = true;
+                break;
+
+            case 'total-goals':
+                const totalGoals = matchResult.totalGoals;
+                const line = parseFloat(bet.outcome.split('-')[1]);
+                if (bet.outcome.startsWith('over') && totalGoals > line) won = true;
+                if (bet.outcome.startsWith('under') && totalGoals < line) won = true;
+                break;
+
+            case 'btts':
+                const btts = matchResult.homeGoals > 0 && matchResult.awayGoals > 0;
+                if (bet.outcome === 'yes' && btts) won = true;
+                if (bet.outcome === 'no' && !btts) won = true;
+                break;
+
+            case 'fh-goals':
+                const fhGoals = matchResult.firstHalfGoals || 0;
+                const fhLine = parseFloat(bet.outcome.split('-')[1]);
+                if (bet.outcome.startsWith('over') && fhGoals > fhLine) won = true;
+                if (bet.outcome.startsWith('under') && fhGoals < fhLine) won = true;
+                break;
+        }
+
+        if (won) {
+            bet.status = 'won';
+            const winnings = bet.stake * bet.odds;
+            userBalance += winnings;
+            showBetMessage(`Bet won! +$${winnings.toFixed(2)}`, 'success');
+        } else {
+            bet.status = 'lost';
+        }
+    });
+
+    updateBalanceDisplay();
+    updateActiveBets();
+}
+
+// Reinitialize betting after dynamic content updates
+function reinitializeBetting() {
+    setupBettingEventListeners();
+}
+
+// Enhanced DOM initialization
+document.addEventListener('DOMContentLoaded', () => {
+    console.log('DOM Content Loaded - starting betting system initialization...');
+
+    // Initialize both betting systems
+    setTimeout(() => {
+        try {
+            console.log('Initializing betting systems...');
+            console.log('autoMode:', autoMode);
+            console.log('gameStarted:', gameStarted);
+            console.log('gameRunning:', gameRunning);
+
+            if (typeof initializeBetting === 'function') {
+                console.log('Calling initializeBetting...');
+                initializeBetting();
+            } else {
+                console.error('initializeBetting function not found!');
+            }
+
+            if (typeof initBettingDashboard === 'function') {
+                console.log('Calling initBettingDashboard...');
+                initBettingDashboard();
+            } else {
+                console.error('initBettingDashboard function not found!');
+            }
+
+            // Always start betting window for new matches (unless in auto mode)
+            if (!autoMode && typeof startBettingTimer === 'function') {
+                console.log('Starting betting timer...');
+                startBettingTimer(20); // 20 seconds initial betting window
+                if (typeof showBetMessage === 'function') {
+                    showBetMessage('Welcome! Betting window is open - place your bets!', 'info');
+                } else {
+                    console.error('showBetMessage function not found!');
+                }
+            } else {
+                console.log('Not starting betting timer - autoMode:', autoMode, 'startBettingTimer available:', typeof startBettingTimer === 'function');
+            }
+            console.log('Betting systems initialized successfully');
+        } catch (error) {
+            console.error('Error initializing betting systems:', error);
+            console.error('Error stack:', error.stack);
+        }
+    }, 1500); // Increased delay to ensure game is fully initialized
+});
+
+// Enhanced match event hooks
+const enhancedOriginalStartPlay = startPlay;
+startPlay = function () {
+    // Call original startPlay first
+    enhancedOriginalStartPlay.apply(this, arguments);
+
+    // Only close betting if there's an active betting window
+    try {
+        if (typeof bettingWindowOpen !== 'undefined' && bettingWindowOpen) {
+            if (typeof closeBettingWindow === 'function') {
+                closeBettingWindow();
+            }
+            if (typeof showBettingStatus === 'function') {
+                showBettingStatus('suspended');
+            }
+            if (typeof showBetMessage === 'function') {
+                showBetMessage('Match started - betting suspended!', 'warning');
+            }
+        }
+
+        // Disable betting markets during match
+        if (typeof toggleBettingMarkets === 'function') {
+            toggleBettingMarkets(false);
+        }
+
+        // Sync overlay immediately
+        syncOverlayWithGameState();
+    } catch (error) {
+        console.error('Error in enhanced startPlay:', error);
+    }
+};
+
+// Hook into game state changes
+function checkGameState() {
+    // Only lock markets when the game is actually running (not just started)
+    if (gameRunning && !marketsLocked) {
+        console.log('Game is running, locking markets...');
+        lockMarkets();
+    } else if (!gameRunning && marketsLocked && gameStarted) {
+        console.log('Game stopped, unlocking markets...');
+        unlockMarkets();
+
+        // If match is completely finished (not just halftime)
+        if (gameHalf === 2 && timer >= halftimeSeconds * 2) {
+            // Settle bets with match result
+            const matchResult = {
+                winner: score.red > score.blue ? 'red' : score.blue > score.red ? 'blue' : 'draw',
+                homeGoals: score.red,
+                awayGoals: score.blue,
+                totalGoals: score.red + score.blue,
+                firstHalfGoals: 0 // This would need to be tracked during the match
+            };
+
+            settleBets(matchResult);
+        }
+    }
+
+    // Don't interfere with betting if game is initialized but not running
+    // This allows betting during the pre-game period
+}
+
+// Check game state periodically
+setInterval(checkGameState, 1000);
+
+// Betting timer and message functions
+function startBettingTimer(seconds = 20) {
+    console.log(`Starting betting timer for ${seconds} seconds...`);
+    console.log('Current game state - gameRunning:', gameRunning, 'gameStarted:', gameStarted);
+
+    bettingTimeLeft = seconds;
+    bettingWindowOpen = true;
+
+    // Clear any existing timer
+    if (bettingTimer) {
+        console.log('Clearing existing betting timer...');
+        clearInterval(bettingTimer);
+    }
+
+    // Explicitly unlock markets and enable betting
+    console.log('Unlocking markets and enabling betting...');
+    marketsLocked = false;
+
+    if (typeof unlockMarkets === 'function') {
+        unlockMarkets();
+    }
+
+    if (typeof toggleBettingMarkets === 'function') {
+        console.log('Enabling betting markets...');
+        toggleBettingMarkets(true);
+    } else {
+        console.error('toggleBettingMarkets function not found!');
+    }
+
+    // Show betting open message
+    console.log('Showing betting status as open...');
+    showBettingStatus('open');
+
+    console.log('Starting betting countdown interval...');
+    bettingTimer = setInterval(() => {
+        bettingTimeLeft--;
+        console.log(`Betting time left: ${bettingTimeLeft} seconds`);
+        updateBettingTimerDisplay();
+
+        if (bettingTimeLeft <= 10 && bettingTimeLeft > 0) {
+            // Show warning when 10 seconds left
+            showBetMessage(`Betting closes in ${bettingTimeLeft} seconds!`, 'warning');
+        } else if (bettingTimeLeft <= 0) {
+            // Close betting window
+            console.log('Betting time expired, closing window...');
+            closeBettingWindow();
+        }
+    }, 1000);
+
+    // Update display immediately
+    updateBettingTimerDisplay();
+    console.log(`Betting window opened for ${seconds} seconds, bettingWindowOpen: ${bettingWindowOpen}`);
+    console.log('Markets locked status:', marketsLocked);
+    console.log('Betting timer ID:', bettingTimer);
+}
+
+function closeBettingWindow() {
+    bettingWindowOpen = false;
+    clearInterval(bettingTimer);
+    bettingTimer = null;
+
+    // Lock markets and show closed message
+    lockMarkets();
+    showBettingStatus('closed');
+    showBetMessage('Betting window closed - match starting soon!', 'error');
+
+    // Start the game after betting window closes
+    if (!gameStarted && !gameRunning) {
+        showGameMessage("KICK OFF!\nMatch Starting...", 1000);
+        setTimeout(() => startPlay(), 1000);
+    }
+}
+
+function updateBettingTimerDisplay() {
+    const timerElement = document.getElementById('bettingTimer');
+    if (timerElement && bettingWindowOpen) {
+        const minutes = Math.floor(bettingTimeLeft / 60);
+        const seconds = bettingTimeLeft % 60;
+        timerElement.textContent = `${minutes}:${seconds.toString().padStart(2, '0')}`;
+
+        // Add urgency styling when time is running out
+        if (bettingTimeLeft <= 10) {
+            timerElement.classList.add('urgent');
+        } else {
+            timerElement.classList.remove('urgent');
+        }
+    }
+
+    // Update overlay timer as well (will be validated against game state)
+    if (bettingWindowOpen) {
+        updateOverlayBettingStatus('open', bettingTimeLeft);
+    } else {
+        syncOverlayWithGameState();
+    }
+}
+
+function showBettingStatus(status) {
+    console.log('showBettingStatus called with status:', status);
+    const statusElement = document.getElementById('bettingStatus');
+    const timerContainer = document.getElementById('bettingTimerContainer');
+    const marketsElement = document.getElementById('bettingMarkets');
+
+    console.log('Status element found:', !!statusElement);
+    console.log('Timer container found:', !!timerContainer);
+    console.log('Markets element found:', !!marketsElement);
+
+    if (statusElement) {
+        if (status === 'open') {
+            console.log('Setting betting status to OPEN');
+            statusElement.innerHTML = `
+                <div class="betting-status-open">
+                    <span class="status-icon">🟢</span>
+                    <span class="status-text">Betting Open</span>
+                </div>
+            `;
+            statusElement.className = 'betting-status open';
+
+            // Make sure the entire betting interface is visible
+            if (marketsElement) {
+                marketsElement.style.display = 'block';
+                marketsElement.style.visibility = 'visible';
+                marketsElement.classList.remove('disabled');
+                console.log('Made betting markets visible');
+            }
+
+        } else if (status === 'closed') {
+            console.log('Setting betting status to CLOSED');
+            statusElement.innerHTML = `
+                <div class="betting-status-closed">
+                    <span class="status-icon">🔴</span>
+                    <span class="status-text">Betting Closed</span>
+                </div>
+            `;
+            statusElement.className = 'betting-status closed';
+        } else if (status === 'suspended') {
+            console.log('Setting betting status to SUSPENDED');
+            statusElement.innerHTML = `
+                <div class="betting-status-suspended">
+                    <span class="status-icon">⏸️</span>
+                    <span class="status-text">Betting Suspended</span>
+                </div>
+            `;
+            statusElement.className = 'betting-status suspended';
+        }
+    } else {
+        console.error('Betting status element not found!');
+    }
+
+    // Update overlay status as well (will be validated against game state)
+    updateOverlayBettingStatus(status);
+
+    // Show/hide timer container
+    if (timerContainer) {
+        timerContainer.style.display = (status === 'open') ? 'block' : 'none';
+        console.log('Timer container display set to:', (status === 'open') ? 'block' : 'none');
+    } else {
+        console.error('Timer container not found!');
+    }
+}
+
+// Additional betting dashboard functions
+function toggleBettingMarkets(enabled) {
+    console.log('toggleBettingMarkets called with enabled:', enabled);
+    const marketsElement = document.getElementById('bettingMarkets');
+
+    if (marketsElement) {
+        console.log('Found betting markets element');
+        if (enabled) {
+            console.log('Enabling betting markets...');
+            marketsElement.classList.remove('disabled');
+            marketsElement.style.display = 'block';
+            marketsElement.style.visibility = 'visible';
+            marketsElement.style.opacity = '1';
+
+            // Enable all betting buttons
+            const bettingButtons = marketsElement.querySelectorAll('.odds-btn');
+            bettingButtons.forEach(btn => {
+                btn.disabled = false;
+                btn.style.pointerEvents = 'auto';
+            });
+
+            console.log('Betting markets enabled');
+        } else {
+            console.log('Disabling betting markets...');
+            marketsElement.classList.add('disabled');
+
+            // Disable all betting buttons
+            const bettingButtons = marketsElement.querySelectorAll('.odds-btn');
+            bettingButtons.forEach(btn => {
+                btn.disabled = true;
+                btn.style.pointerEvents = 'none';
+            });
+
+            console.log('Betting markets disabled');
+        }
+    } else {
+        console.error('Betting markets element not found!');
+    }
+}
+
+function animateOddsChange() {
+    const oddElements = document.querySelectorAll('.odds-value');
+    oddElements.forEach(element => {
+        if (element) {
+            element.style.transform = 'scale(1.1)';
+            element.style.color = '#ff6b6b';
+            setTimeout(() => {
+                element.style.transform = 'scale(1)';
+                element.style.color = '#ffd700';
+            }, 300);
+        }
+    });
+}
+
+function startMatchCountdown(seconds = 20) {
+    let countdownSeconds = seconds;
+    const countdownElement = document.getElementById('matchCountdown');
+
+    if (!countdownElement) return;
+
+    const countdownInterval = setInterval(() => {
+        if (countdownSeconds > 0) {
+            countdownElement.textContent = `Next match in: ${countdownSeconds}s`;
+            countdownSeconds--;
+        } else {
+            countdownElement.textContent = 'Match starting...';
+            clearInterval(countdownInterval);
+        }
+    }, 1000);
+}
+
+function stopMatchCountdown() {
+    const countdownElement = document.getElementById('matchCountdown');
+    if (countdownElement) {
+        countdownElement.textContent = 'Match in progress...';
+    }
+}
+
+// Enhanced finishMatch function - temporarily disabled for debugging
+/*
+const enhancedOriginalFinishMatch = finishMatch;
+finishMatch = function () {
+    // Call original finishMatch first to properly complete the match
+    enhancedOriginalFinishMatch.call(this);
+
+    // Only settle bets after match is completely finished
+    setTimeout(() => {
+        const matchResult = {
+            homeGoals: currentMatch.homeGoals,
+            awayGoals: currentMatch.awayGoals,
+            totalGoals: currentMatch.totalGoals,
+            firstHalfHomeGoals: currentMatch.firstHalfHomeGoals,
+            firstHalfAwayGoals: currentMatch.firstHalfAwayGoals,
+            firstHalfGoals: currentMatch.firstHalfHomeGoals + currentMatch.firstHalfAwayGoals,
+            winner: currentMatch.result === 'Home Win' ? 'red' : currentMatch.result === 'Away Win' ? 'blue' : 'draw'
+        };
+
+        // Settle bets only if there are active bets
+        if (activeBets.length > 0) {
+            settleBets(matchResult);
+        }
+
+        // Re-enable betting markets and start new betting window
+        setTimeout(() => {
+            toggleBettingMarkets(true);
+            unlockMarkets();
+
+            // Only start new betting window if not in auto mode or if there are more matches
+            if (!autoMode || (autoMode && currentMatchNumber < totalMatches)) {
+                startBettingTimer(20); // 20 seconds to place bets
+                showBetMessage('New betting window opened - place your bets!', 'info');
+            }
+
+            // Update odds after each match (simulate market movement)
+            animateOddsChange();
+            updateBettingOdds();
+        }, 1000);
+
+        // Start countdown for next match if in auto mode
+        if (autoMode && currentMatchNumber < totalMatches) {
+            startMatchCountdown(20);
+        }
+    }, 500);
+};
+*/
+
+// Enhanced startNextMatch function - temporarily disabled for debugging
+/*
+const enhancedOriginalStartNextMatch = startNextMatch;
+startNextMatch = function () {
+    // Stop any active betting countdown
+    if (typeof stopMatchCountdown === 'function') {
+        stopMatchCountdown();
+    }
+
+    // Close any active betting windows
+    if (bettingWindowOpen) {
+        closeBettingWindow();
+    }
+
+    // Call original function
+    enhancedOriginalStartNextMatch.call(this);
+};
+*/
+
+// Update overlay betting status
+function updateOverlayBettingStatus(status, timeLeft = null) {
+    const statusIndicator = document.getElementById('overlayStatusIndicator');
+    const statusText = document.getElementById('overlayStatusText');
+    const bettingTimer = document.getElementById('overlayBettingTimer');
+    const timerValue = document.getElementById('overlayTimerValue');
+
+    if (!statusIndicator || !statusText) return;
+
+    // Validate status against actual game state
+    let actualStatus = status;
+
+    // If game is running, markets must be suspended regardless of input
+    if (gameRunning) {
+        actualStatus = 'suspended';
+    }
+    // If markets are locked, they can't be open
+    else if (marketsLocked && status === 'open') {
+        actualStatus = 'closed';
+    }
+    // If betting window is closed, markets can't be open
+    else if (!bettingWindowOpen && status === 'open') {
+        actualStatus = 'closed';
+    }
+
+    // Remove all status classes
+    statusIndicator.classList.remove('open', 'closed', 'suspended');
+
+    switch (actualStatus) {
+        case 'open':
+            statusIndicator.classList.add('open');
+            statusText.textContent = 'Markets Open';
+            if (bettingTimer && timeLeft !== null && timeLeft > 0) {
+                bettingTimer.style.display = 'flex';
+                const minutes = Math.floor(timeLeft / 60);
+                const seconds = timeLeft % 60;
+                timerValue.textContent = `${minutes}:${seconds.toString().padStart(2, '0')}`;
+            } else {
+                if (bettingTimer) bettingTimer.style.display = 'none';
+            }
+            break;
+        case 'closed':
+            statusIndicator.classList.add('closed');
+            statusText.textContent = 'Markets Closed';
+            if (bettingTimer) {
+                bettingTimer.style.display = 'none';
+            }
+            break;
+        case 'suspended':
+            statusIndicator.classList.add('suspended');
+            statusText.textContent = 'Markets Suspended';
+            if (bettingTimer) {
+                bettingTimer.style.display = 'none';
+            }
+            break;
+        default:
+            statusIndicator.classList.add('closed');
+            statusText.textContent = 'Markets Closed';
+            if (bettingTimer) {
+                bettingTimer.style.display = 'none';
+            }
+    }
+}
+
+// Initialize overlay status
+function initializeOverlayStatus() {
+    // Check actual betting state and sync overlay
+    // Only suspend when game is actually running, not just initialized
+    if (gameRunning) {
+        updateOverlayBettingStatus('suspended');
+    } else if (bettingWindowOpen && !marketsLocked) {
+        updateOverlayBettingStatus('open', bettingTimeLeft);
+    } else {
+        updateOverlayBettingStatus('closed');
+    }
+}
+
+// Sync overlay with current game state
+function syncOverlayWithGameState() {
+    // Only suspend betting when game is actually running, not just when it's started
+    if (gameRunning) {
+        updateOverlayBettingStatus('suspended');
+    } else if (bettingWindowOpen && !marketsLocked) {
+        updateOverlayBettingStatus('open', bettingTimeLeft);
+    } else {
+        updateOverlayBettingStatus('closed');
+    }
+}
