@@ -1775,6 +1775,170 @@ function updateBettingOdds() {
     if (fhUnder05OddEl) fhUnder05OddEl.textContent = calculateOdds(fhUnder05Prob).toFixed(2);
 }
 
+/**
+ * Calculates and displays updated "live" odds at halftime.
+ * This is a simplified model.
+ */
+function updateLiveOdds() {
+    console.log(`Updating live odds. HT Score: ${score.red} - ${score.blue}`);
+    const stats = historicalStats;
+    const total = stats.totalMatches;
+
+    // --- Base Probabilities (from historical data) ---
+    let baseHomeWinProb = stats.homeWins / total;
+    let baseDrawProb = stats.draws / total;
+    let baseAwayWinProb = stats.awayWins / total;
+
+    // --- 1X2 Market (Full Time) ---
+    let htScoreDiff = score.red - score.blue;
+    let modHome, modDraw, modAway;
+
+    if (htScoreDiff > 0) { // Red (Home) is winning
+        modHome = baseHomeWinProb + 0.35; // Big boost
+        modAway = baseAwayWinProb - 0.25; // Big drop
+        modDraw = baseDrawProb - 0.10;  // Drop
+    } else if (htScoreDiff < 0) { // Blue (Away) is winning
+        modHome = baseHomeWinProb - 0.25;
+        modAway = baseAwayWinProb + 0.35;
+        modDraw = baseDrawProb - 0.10;
+    } else { // Draw at HT
+        modHome = baseHomeWinProb - 0.1;
+        modAway = baseAwayWinProb - 0.1;
+        modDraw = baseDrawProb + 0.2; // Draw is now more likely
+    }
+
+    // Normalize probabilities (ensure they sum to 1 and are > 0)
+    modHome = Math.max(0.01, modHome);
+    modAway = Math.max(0.01, modAway);
+    modDraw = Math.max(0.01, modDraw);
+
+    const totalProb = modHome + modDraw + modAway;
+    const finalHomeProb = modHome / totalProb;
+    const finalDrawProb = modDraw / totalProb;
+    const finalAwayProb = modAway / totalProb;
+
+    // Update 1x2 Odds
+    updateOddElement('redWinOdd', 'button[data-outcome="red-win"]', finalHomeProb);
+    updateOddElement('drawOdd', 'button[data-outcome="draw"]', finalDrawProb);
+    updateOddElement('blueWinOdd', 'button[data-outcome="blue-win"]', finalAwayProb);
+
+    // --- Total Goals (Over/Under) Markets ---
+    const currentTotalGoals = score.red + score.blue;
+
+    const over25El = document.querySelector('button[data-outcome="over-2.5"]');
+    const under25El = document.querySelector('button[data-outcome="under-2.5"]');
+    let over25Odd = parseFloat(over25El.dataset.odd);
+    let under25Odd = parseFloat(under25El.dataset.odd);
+
+    if (currentTotalGoals === 0) {
+        over25Odd *= 1.5; // Harder
+        under25Odd *= 0.7; // Easier
+    } else if (currentTotalGoals === 1) {
+        over25Odd *= 1.1;
+        under25Odd *= 0.9;
+    } else if (currentTotalGoals === 2) {
+        over25Odd *= 0.7; // Easier
+        under25Odd *= 1.5; // Harder
+    } else if (currentTotalGoals >= 3) {
+        // Settle this market - disable buttons
+        disableMarketButton(over25El, "Settled (Over)");
+        disableMarketButton(under25El, "Settled (Over)");
+    }
+
+    if (currentTotalGoals < 3) {
+        updateOddElement('over25Odd', 'button[data-outcome="over-2.5"]', 1 / over25Odd, over25Odd);
+        updateOddElement('under25Odd', 'button[data-outcome="under-2.5"]', 1 / under25Odd, under25Odd);
+    }
+
+    // --- BTTS (Both Teams to Score) ---
+    const bttsYesEl = document.querySelector('button[data-outcome="yes"]');
+    const bttsNoEl = document.querySelector('button[data-outcome="no"]');
+    let bttsYesOdd = parseFloat(bttsYesEl.dataset.odd);
+    let bttsNoOdd = parseFloat(bttsNoEl.dataset.odd);
+
+
+    if (score.red > 0 && score.blue > 0) {
+        disableMarketButton(bttsYesEl, "Settled (Yes)");
+        disableMarketButton(bttsNoEl, "Settled (Yes)");
+    } else if (score.red === 0 && score.blue === 0) {
+        // Harder for BTTS, easier for "No"
+        bttsYesOdd *= 1.4; // Harder for "Yes"
+        bttsNoOdd *= 0.7;  // Easier for "No"
+        updateOddElement('bttsYesOdd', 'button[data-outcome="yes"]', 1 / bttsYesOdd, bttsYesOdd);
+        updateOddElement('bttsNoOdd', 'button[data-outcome="no"]', 1 / bttsNoOdd, bttsNoOdd);
+    } else {
+        // One team has scored. "Yes" is now much more likely.
+        bttsYesOdd *= 0.6; // Easier for "Yes"
+        updateOddElement('bttsYesOdd', 'button[data-outcome="yes"]', 1 / bttsYesOdd, bttsYesOdd);
+        disableMarketButton(bttsNoEl, "Settled (No)"); // "No" is now impossible
+    }
+
+    // --- First Half Goals Market ---
+    // This market is over. Disable all buttons.
+    document.querySelectorAll('button[data-market="fh-goals"]').forEach(btn => {
+        disableMarketButton(btn, "Market Closed");
+    });
+
+    // Animate the odds changes
+    animateOddsChange();
+}
+
+/**
+ * Helper function to update a single odd element's text and data-odd.
+ * @param {string} elementId - The ID of the span/div holding the odds value.
+ * @param {string} buttonSelector - The CSS selector for the button.
+ * @param {number} probability - The new probability (0-1).
+ * @param {number} [forcedOdd] - Optional: If you want to set a specific odd instead of calculating from prob.
+ */
+function updateOddElement(elementId, buttonSelector, probability, forcedOdd = null) {
+    const oddSpan = document.getElementById(elementId);
+    const oddButton = document.querySelector(buttonSelector);
+
+    if (!oddSpan || !oddButton) {
+        console.warn(`Element not found for ${elementId} or ${buttonSelector}`);
+        return;
+    }
+
+    let newOdd;
+    if (forcedOdd) {
+        newOdd = Math.max(1.01, forcedOdd);
+    } else {
+        newOdd = calculateOdds(probability, 0.05); // Use existing calculateOdds function
+    }
+
+    const newOddStr = newOdd.toFixed(2);
+    
+    oddSpan.textContent = newOddStr;
+    oddButton.dataset.odd = newOddStr;
+    
+    // Re-enable button in case it was disabled
+    oddButton.disabled = false;
+    oddButton.classList.remove('suspended');
+    oddButton.style.pointerEvents = 'auto';
+}
+
+/**
+ * Helper function to disable a market button.
+ * @param {HTMLElement} buttonElement - The button to disable.
+ * @param {string} text - The text to display (e.g., "Settled").
+ */
+function disableMarketButton(buttonElement, text) {
+    if (!buttonElement) return;
+    
+    buttonElement.disabled = true;
+    buttonElement.classList.add('suspended');
+    buttonElement.style.pointerEvents = 'none';
+    
+    const selectionEl = buttonElement.querySelector('.selection');
+    if (selectionEl) {
+        selectionEl.textContent = text;
+    }
+    const oddsEl = buttonElement.querySelector('.odds-value');
+    if (oddsEl) {
+        oddsEl.textContent = '-';
+    }
+}
+
 // Countdown timer between matches
 let countdownInterval;
 let countdownSeconds = 0;
@@ -2711,6 +2875,7 @@ function syncOverlayWithGameState() {
         updateOverlayBettingStatus('closed');
     }
 }
+
 
 
 
