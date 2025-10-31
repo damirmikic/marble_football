@@ -1207,7 +1207,6 @@ function logGoal(team) {
     }
     currentMatch.totalGoals++;
 }
-
 function finishMatch() {
     // Determine result
     if (currentMatch.homeGoals > currentMatch.awayGoals) {
@@ -1221,12 +1220,37 @@ function finishMatch() {
     // Add to match data
     matchData.push({ ...currentMatch });
 
+    // --- START MODIFICATION: Implement Bet Settlement ---
+    // Settle all active bets now that the match is final
+    if (typeof settleBets === 'function' && activeBets.length > 0) {
+        console.log('Match finished, settling active bets...');
+        
+        // Create the matchResult object in the format settleBets expects
+        const matchResult = {
+            winner: currentMatch.result === 'Home Win' ? 'red' : currentMatch.result === 'Away Win' ? 'blue' : 'draw',
+            homeGoals: currentMatch.homeGoals,
+            awayGoals: currentMatch.awayGoals,
+            totalGoals: currentMatch.totalGoals,
+            firstHalfHomeGoals: currentMatch.firstHalfHomeGoals,
+            firstHalfAwayGoals: currentMatch.firstHalfAwayGoals,
+            firstHalfGoals: currentMatch.firstHalfHomeGoals + currentMatch.firstHalfAwayGoals, // Combined for fh-goals market
+            btts: (currentMatch.homeGoals > 0 && currentMatch.awayGoals > 0) // Explicitly add btts result
+        };
+        
+        // Add a short delay to allow the final score to be seen before settlement UI updates
+        setTimeout(() => {
+            settleBets(matchResult);
+        }, 1500); // 1.5 second delay
+    }
+    // --- END MODIFICATION ---
+
     // Update progress
     if (autoMode) {
         document.getElementById('matchProgress').textContent =
             `Match ${currentMatchNumber} of ${totalMatches} completed - ${currentMatch.homeTeam} ${currentMatch.homeGoals}-${currentMatch.awayGoals} ${currentMatch.awayTeam}`;
     }
 }
+
 
 function resetMatchData() {
     currentMatch = {
@@ -2674,5 +2698,6 @@ function syncOverlayWithGameState() {
         updateOverlayBettingStatus('closed');
     }
 }
+
 
 
