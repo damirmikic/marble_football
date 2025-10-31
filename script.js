@@ -379,10 +379,16 @@ function createAllPlayers() {
 }
 
 function createBall() {
-    ball = new PIXI.Graphics();
-    ball.beginFill(0xFFFFFF); // White
-    ball.drawCircle(0, 0, BALL_RADIUS);
-    ball.endFill();
+    // --- START MODIFICATION: Use Sprite for football texture ---
+    // Load a texture from a URL (using a free, public-domain soccer ball image)
+    const texture = PIXI.Texture.from('https://upload.wikimedia.org/wikipedia/commons/thumb/d/d3/Soccerball.svg/200px-Soccerball.svg.png');
+    ball = new PIXI.Sprite(texture);
+
+    ball.anchor.set(0.5); // Set anchor to center for proper rotation/positioning
+    ball.width = BALL_RADIUS * 2;
+    ball.height = BALL_RADIUS * 2;
+    // --- END MODIFICATION ---
+
     ball.radius = BALL_RADIUS;
     resetBall(); // Set initial position and velocity
     app.stage.addChild(ball);
@@ -2664,3 +2670,4 @@ function syncOverlayWithGameState() {
         updateOverlayBettingStatus('closed');
     }
 }
+
