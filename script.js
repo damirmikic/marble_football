@@ -14,7 +14,7 @@ const goalScore = document.getElementById('goalScore');
 const SCREEN_WIDTH = 800;
 const SCREEN_HEIGHT = 500;
 const PLAYER_RADIUS = 15; // Larger circles
-const BALL_RADIUS = 8; // Larger ball
+const BALL_RADIUS = 8; // Ball radius
 const GOAL_WIDTH = 10;
 const GOAL_HEIGHT = 100;
 const MAX_PLAYER_SPEED = 4; // Increased from 2 to 4 for faster gameplay
@@ -701,6 +701,7 @@ function updateTimer(elapsedMS) {
     }
 }
 
+
 function updateScore() {
     const scoreHTML = `
         <span class="team-red">Red: ${score.red}</span> - 
@@ -868,7 +869,10 @@ function updateBall(deltaTime = 1) {
     ball.vy *= frictionRate;
 
     // --- START MODIFICATION: Add ball rotation ---
-    ball.rotation += 0.1 * ball.vx; // Spin the ball based on its horizontal velocity
+    // Use a value scaled by velocity but clamped for reasonable spin
+    const spinFactor = 0.1;
+    const spin = Math.max(-2, Math.min(2, ball.vx * spinFactor)) * gameSpeed;
+    ball.rotation += spin;
     // --- END MODIFICATION ---
 
     // Ensure ball maintains minimum movement
@@ -950,6 +954,7 @@ function updateBall(deltaTime = 1) {
         ball.vx *= -1;
     }
 }
+
 
 function checkAllCollisions() {
     // Player vs Player
@@ -1220,6 +1225,7 @@ function logGoal(team) {
     }
     currentMatch.totalGoals++;
 }
+
 function finishMatch() {
     // Determine result
     if (currentMatch.homeGoals > currentMatch.awayGoals) {
@@ -1288,26 +1294,6 @@ function resetMatchData() {
     timer = 0;
     injuryTimeStarted = false;
     injuryTime = { first: 0, second: 0 };
-}
-
-function cleanupGameObjects() {
-    console.log('Cleaning up game objects...');
-
-    // Remove all children from the stage
-    while (app.stage.children.length > 0) {
-        const child = app.stage.children[0];
-        app.stage.removeChild(child);
-        if (child.destroy) {
-            child.destroy();
-        }
-    }
-
-    // Clear arrays
-    players.length = 0;
-    ball = null;
-    gameMessage = null;
-
-    console.log('Game objects cleaned up');
 }
 
 function cleanupGameObjects() {
@@ -1465,7 +1451,7 @@ document.getElementById('startMatches').addEventListener('click', () => {
 
     resetToCenter();
     updateScore();
-    setTimeout(() => startPlay(), 1000);
+    // Betting window will be started by default, which will then start the match
 });
 
 document.getElementById('downloadCSV').addEventListener('click', downloadCSV);
@@ -1724,13 +1710,9 @@ function updateBettingOdds() {
     const drawProb = stats.draws / total;
     const awayWinProb = stats.awayWins / total;
 
-    const redWinOddEl = document.getElementById('redWinOdd');
-    const drawOddEl = document.getElementById('drawOdd');
-    const blueWinOddEl = document.getElementById('blueWinOdd');
-
-    if (redWinOddEl) redWinOddEl.textContent = calculateOdds(homeWinProb).toFixed(2);
-    if (drawOddEl) drawOddEl.textContent = calculateOdds(drawProb).toFixed(2);
-    if (blueWinOddEl) blueWinOddEl.textContent = calculateOdds(awayWinProb).toFixed(2);
+    updateOddElement('redWinOdd', 'button[data-outcome="red-win"]', homeWinProb);
+    updateOddElement('drawOdd', 'button[data-outcome="draw"]', drawProb);
+    updateOddElement('blueWinOdd', 'button[data-outcome="blue-win"]', awayWinProb);
 
     // Total Goals Market (Over/Under 2.5)
     let over25Count = 0;
@@ -1747,10 +1729,9 @@ function updateBettingOdds() {
     const over25Prob = over25Count / total;
     const under25Prob = 1 - over25Prob;
 
-    const over25OddEl = document.getElementById('over25Odd');
-    const under25OddEl = document.getElementById('under25Odd');
-    if (over25OddEl) over25OddEl.textContent = calculateOdds(over25Prob).toFixed(2);
-    if (under25OddEl) under25OddEl.textContent = calculateOdds(under25Prob).toFixed(2);
+    updateOddElement('over25Odd', 'button[data-outcome="over-2.5"]', over25Prob);
+    updateOddElement('under25Odd', 'button[data-outcome="under-2.5"]', under25Prob);
+
 
     // Both Teams To Score
     const homeScoreProb = 1 - (stats.homeGoals[0] / total);
@@ -1758,10 +1739,8 @@ function updateBettingOdds() {
     const bttsYesProb = homeScoreProb * awayScoreProb;
     const bttsNoProb = 1 - bttsYesProb;
 
-    const bttsYesOddEl = document.getElementById('bttsYesOdd');
-    const bttsNoOddEl = document.getElementById('bttsNoOdd');
-    if (bttsYesOddEl) bttsYesOddEl.textContent = calculateOdds(bttsYesProb).toFixed(2);
-    if (bttsNoOddEl) bttsNoOddEl.textContent = calculateOdds(bttsNoProb).toFixed(2);
+    updateOddElement('bttsYesOdd', 'button[data-outcome="yes"]', bttsYesProb);
+    updateOddElement('bttsNoOdd', 'button[data-outcome="no"]', bttsNoProb);
 
     // First Half Goals (Over/Under 0.5)
     const fhHomeScoreProb = 1 - (stats.firstHalfHome[0] / total);
@@ -1769,174 +1748,27 @@ function updateBettingOdds() {
     const fhOver05Prob = 1 - ((stats.firstHalfHome[0] / total) * (stats.firstHalfAway[0] / total));
     const fhUnder05Prob = 1 - fhOver05Prob;
 
-    const fhOver05OddEl = document.getElementById('fhOver05Odd');
-    const fhUnder05OddEl = document.getElementById('fhUnder05Odd');
-    if (fhOver05OddEl) fhOver05OddEl.textContent = calculateOdds(fhOver05Prob).toFixed(2);
-    if (fhUnder05OddEl) fhUnder05OddEl.textContent = calculateOdds(fhUnder05Prob).toFixed(2);
-}
+    updateOddElement('fhOver05Odd', 'button[data-outcome="over-0.5"]', fhOver05Prob);
+    updateOddElement('fhUnder05Odd', 'button[data-outcome="under-0.5"]', fhUnder05Prob);
 
-/**
- * Calculates and displays updated "live" odds at halftime.
- * This is a simplified model.
- */
-function updateLiveOdds() {
-    console.log(`Updating live odds. HT Score: ${score.red} - ${score.blue}`);
-    const stats = historicalStats;
-    const total = stats.totalMatches;
-
-    // --- Base Probabilities (from historical data) ---
-    let baseHomeWinProb = stats.homeWins / total;
-    let baseDrawProb = stats.draws / total;
-    let baseAwayWinProb = stats.awayWins / total;
-
-    // --- 1X2 Market (Full Time) ---
-    let htScoreDiff = score.red - score.blue;
-    let modHome, modDraw, modAway;
-
-    if (htScoreDiff > 0) { // Red (Home) is winning
-        modHome = baseHomeWinProb + 0.35; // Big boost
-        modAway = baseAwayWinProb - 0.25; // Big drop
-        modDraw = baseDrawProb - 0.10;  // Drop
-    } else if (htScoreDiff < 0) { // Blue (Away) is winning
-        modHome = baseHomeWinProb - 0.25;
-        modAway = baseAwayWinProb + 0.35;
-        modDraw = baseDrawProb - 0.10;
-    } else { // Draw at HT
-        modHome = baseHomeWinProb - 0.1;
-        modAway = baseAwayWinProb - 0.1;
-        modDraw = baseDrawProb + 0.2; // Draw is now more likely
-    }
-
-    // Normalize probabilities (ensure they sum to 1 and are > 0)
-    modHome = Math.max(0.01, modHome);
-    modAway = Math.max(0.01, modAway);
-    modDraw = Math.max(0.01, modDraw);
-
-    const totalProb = modHome + modDraw + modAway;
-    const finalHomeProb = modHome / totalProb;
-    const finalDrawProb = modDraw / totalProb;
-    const finalAwayProb = modAway / totalProb;
-
-    // Update 1x2 Odds
-    updateOddElement('redWinOdd', 'button[data-outcome="red-win"]', finalHomeProb);
-    updateOddElement('drawOdd', 'button[data-outcome="draw"]', finalDrawProb);
-    updateOddElement('blueWinOdd', 'button[data-outcome="blue-win"]', finalAwayProb);
-
-    // --- Total Goals (Over/Under) Markets ---
-    const currentTotalGoals = score.red + score.blue;
-
-    const over25El = document.querySelector('button[data-outcome="over-2.5"]');
-    const under25El = document.querySelector('button[data-outcome="under-2.5"]');
-    let over25Odd = parseFloat(over25El.dataset.odd);
-    let under25Odd = parseFloat(under25El.dataset.odd);
-
-    if (currentTotalGoals === 0) {
-        over25Odd *= 1.5; // Harder
-        under25Odd *= 0.7; // Easier
-    } else if (currentTotalGoals === 1) {
-        over25Odd *= 1.1;
-        under25Odd *= 0.9;
-    } else if (currentTotalGoals === 2) {
-        over25Odd *= 0.7; // Easier
-        under25Odd *= 1.5; // Harder
-    } else if (currentTotalGoals >= 3) {
-        // Settle this market - disable buttons
-        disableMarketButton(over25El, "Settled (Over)");
-        disableMarketButton(under25El, "Settled (Over)");
-    }
-
-    if (currentTotalGoals < 3) {
-        updateOddElement('over25Odd', 'button[data-outcome="over-2.5"]', 1 / over25Odd, over25Odd);
-        updateOddElement('under25Odd', 'button[data-outcome="under-2.5"]', 1 / under25Odd, under25Odd);
-    }
-
-    // --- BTTS (Both Teams to Score) ---
-    const bttsYesEl = document.querySelector('button[data-outcome="yes"]');
-    const bttsNoEl = document.querySelector('button[data-outcome="no"]');
-    let bttsYesOdd = parseFloat(bttsYesEl.dataset.odd);
-    let bttsNoOdd = parseFloat(bttsNoEl.dataset.odd);
-
-
-    if (score.red > 0 && score.blue > 0) {
-        disableMarketButton(bttsYesEl, "Settled (Yes)");
-        disableMarketButton(bttsNoEl, "Settled (Yes)");
-    } else if (score.red === 0 && score.blue === 0) {
-        // Harder for BTTS, easier for "No"
-        bttsYesOdd *= 1.4; // Harder for "Yes"
-        bttsNoOdd *= 0.7;  // Easier for "No"
-        updateOddElement('bttsYesOdd', 'button[data-outcome="yes"]', 1 / bttsYesOdd, bttsYesOdd);
-        updateOddElement('bttsNoOdd', 'button[data-outcome="no"]', 1 / bttsNoOdd, bttsNoOdd);
-    } else {
-        // One team has scored. "Yes" is now much more likely.
-        bttsYesOdd *= 0.6; // Easier for "Yes"
-        updateOddElement('bttsYesOdd', 'button[data-outcome="yes"]', 1 / bttsYesOdd, bttsYesOdd);
-        disableMarketButton(bttsNoEl, "Settled (No)"); // "No" is now impossible
-    }
-
-    // --- First Half Goals Market ---
-    // This market is over. Disable all buttons.
+    // Re-enable all fh-goals buttons (as this is pre-match)
     document.querySelectorAll('button[data-market="fh-goals"]').forEach(btn => {
-        disableMarketButton(btn, "Market Closed");
+        btn.disabled = false;
+        btn.classList.remove('suspended');
+        btn.style.pointerEvents = 'auto';
+        const selectionEl = btn.querySelector('.selection');
+        const oddsEl = btn.querySelector('.odds-value');
+        if (selectionEl && selectionEl.textContent.includes('Market Closed')) {
+             // Reset text
+             const outcome = btn.dataset.outcome;
+             if(outcome === 'over-0.5') selectionEl.textContent = 'Over 0.5';
+             if(outcome === 'under-0.5') selectionEl.textContent = 'Under 0.5';
+             if(outcome === 'over-1.5') selectionEl.textContent = 'Over 1.5';
+             if(outcome === 'under-1.5') selectionEl.textContent = 'Under 1.5';
+             if(outcome === 'over-2.5') selectionEl.textContent = 'Over 2.5';
+             if(outcome === 'under-2.5') selectionEl.textContent = 'Under 2.5';
+        }
     });
-
-    // Animate the odds changes
-    animateOddsChange();
-}
-
-/**
- * Helper function to update a single odd element's text and data-odd.
- * @param {string} elementId - The ID of the span/div holding the odds value.
- * @param {string} buttonSelector - The CSS selector for the button.
- * @param {number} probability - The new probability (0-1).
- * @param {number} [forcedOdd] - Optional: If you want to set a specific odd instead of calculating from prob.
- */
-function updateOddElement(elementId, buttonSelector, probability, forcedOdd = null) {
-    const oddSpan = document.getElementById(elementId);
-    const oddButton = document.querySelector(buttonSelector);
-
-    if (!oddSpan || !oddButton) {
-        console.warn(`Element not found for ${elementId} or ${buttonSelector}`);
-        return;
-    }
-
-    let newOdd;
-    if (forcedOdd) {
-        newOdd = Math.max(1.01, forcedOdd);
-    } else {
-        newOdd = calculateOdds(probability, 0.05); // Use existing calculateOdds function
-    }
-
-    const newOddStr = newOdd.toFixed(2);
-    
-    oddSpan.textContent = newOddStr;
-    oddButton.dataset.odd = newOddStr;
-    
-    // Re-enable button in case it was disabled
-    oddButton.disabled = false;
-    oddButton.classList.remove('suspended');
-    oddButton.style.pointerEvents = 'auto';
-}
-
-/**
- * Helper function to disable a market button.
- * @param {HTMLElement} buttonElement - The button to disable.
- * @param {string} text - The text to display (e.g., "Settled").
- */
-function disableMarketButton(buttonElement, text) {
-    if (!buttonElement) return;
-    
-    buttonElement.disabled = true;
-    buttonElement.classList.add('suspended');
-    buttonElement.style.pointerEvents = 'none';
-    
-    const selectionEl = buttonElement.querySelector('.selection');
-    if (selectionEl) {
-        selectionEl.textContent = text;
-    }
-    const oddsEl = buttonElement.querySelector('.odds-value');
-    if (oddsEl) {
-        oddsEl.textContent = '-';
-    }
 }
 
 // Countdown timer between matches
@@ -1968,7 +1800,7 @@ function stopMatchCountdown() {
 
 // Add betting odds animation
 function animateOddsChange() {
-    const oddElements = document.querySelectorAll('.odd');
+    const oddElements = document.querySelectorAll('.odds-value');
     oddElements.forEach(element => {
         element.style.transform = 'scale(1.1)';
         element.style.color = '#ff6b6b';
@@ -1998,18 +1830,12 @@ function initBettingDashboard() {
     updateBalanceDisplay();
 
     // Add click handlers for betting odds
-    document.querySelectorAll('.odd-item').forEach(item => {
-        item.addEventListener('click', function () {
-            const market = this.dataset.market;
-            const outcome = this.dataset.outcome;
-            const odd = this.dataset.odd;
-
+    document.querySelectorAll('.odds-btn').forEach(item => {
+        item.addEventListener('click', function (e) {
             // This functionality is handled by handleOddsClick
             // selectBet(market, this.querySelector('.outcome').textContent, odd);
-
-            // Add visual feedback
-            document.querySelectorAll('.odd-item').forEach(el => el.classList.remove('selected'));
-            this.classList.add('selected');
+            
+            // The handleOddsClick function is now the primary listener
         });
     });
 
@@ -2094,8 +1920,13 @@ function handleOddsClick(event) {
         showBetMessage('Markets are currently suspended during live play', 'warning');
         return;
     }
-
+    
     const btn = event.currentTarget;
+    if (btn.disabled) {
+        showBetMessage('This market is settled or closed', 'warning');
+        return;
+    }
+
     const market = btn.dataset.market;
     const outcome = btn.dataset.outcome;
     const odds = parseFloat(btn.dataset.odd);
@@ -2165,8 +1996,8 @@ function updatePotentialWin() {
     const potentialWinSpan = document.getElementById('potentialWin');
 
     if (currentBet && betAmount > 0) {
-        const potentialWin = (betAmount * currentBet.odds) - betAmount;
-        potentialWinSpan.textContent = potentialWin.toFixed(2);
+        const potentialWin = (betAmount * currentBet.odds); // This should be total return
+        potentialWinSpan.textContent = potentialWin.toFixed(2); // Show total return
     } else {
         potentialWinSpan.textContent = '0.00';
     }
@@ -2214,7 +2045,7 @@ function placeBet() {
         marketName: currentBet.marketName,
         odds: currentBet.odds,
         stake: betAmount,
-        potentialWin: (betAmount * currentBet.odds) - betAmount,
+        potentialReturn: (betAmount * currentBet.odds),
         status: 'pending',
         timestamp: new Date()
     };
@@ -2265,13 +2096,18 @@ function updateActiveBets() {
     }
 
     betsList.innerHTML = activeBets.map(bet => `
-        <div class="bet-item">
+        <div class="bet-item ${bet.status}">
             <div class="bet-details">
                 <div class="bet-market">${bet.marketName}</div>
                 <div class="bet-selection-details">${bet.selection}</div>
-                <div class="bet-stake-odds">$${bet.stake.toFixed(2)} @ ${bet.odds.toFixed(2)}</div>
+                <div class="bet-stake-odds">
+                    Stake: $${bet.stake.toFixed(2)} @ ${bet.odds.toFixed(2)}
+                </div>
+                <div class="bet-potential-return">
+                    Return: $${(bet.status === 'won') ? bet.potentialReturn.toFixed(2) : (bet.status === 'pending' ? bet.potentialReturn.toFixed(2) : '0.00')}
+                </div>
             </div>
-            <div class="bet-status ${bet.status}">${bet.status}</div>
+            <div class="bet-status">${bet.status}</div>
         </div>
     `).join('');
 }
@@ -2311,9 +2147,9 @@ function unlockMarkets() {
 
 // Settle bets after match
 function settleBets(matchResult) {
-    // Safety check - don't settle if match is still running or no result
-    if (gameRunning || !matchResult || activeBets.length === 0) {
-        console.log('Skipping bet settlement - match still running or no bets');
+    // Safety check - don't settle if no result
+    if (!matchResult || activeBets.length === 0) {
+        console.log('Skipping bet settlement - no result or no bets');
         return;
     }
 
@@ -2340,22 +2176,24 @@ function settleBets(matchResult) {
                 break;
 
             case 'btts':
-                const btts = matchResult.homeGoals > 0 && matchResult.awayGoals > 0;
+                const btts = matchResult.btts;
                 if (bet.outcome === 'yes' && btts) won = true;
                 if (bet.outcome === 'no' && !btts) won = true;
                 break;
 
             case 'fh-goals':
-                const fhGoals = matchResult.firstHalfGoals || 0;
+                const fhGoals = matchResult.firstHalfGoals;
                 const fhLine = parseFloat(bet.outcome.split('-')[1]);
                 if (bet.outcome.startsWith('over') && fhGoals > fhLine) won = true;
                 if (bet.outcome.startsWith('under') && fhGoals < fhLine) won = true;
                 break;
+            
+            // Add cases for other markets like 'specials' if needed
         }
 
         if (won) {
             bet.status = 'won';
-            const winnings = bet.stake * bet.odds;
+            const winnings = bet.potentialReturn;
             userBalance += winnings;
             showBetMessage(`Bet won! +$${winnings.toFixed(2)}`, 'success');
         } else {
@@ -2454,29 +2292,18 @@ startPlay = function () {
 function checkGameState() {
     // Only lock markets when the game is actually running (not just started)
     if (gameRunning && !marketsLocked) {
-        console.log('Game is running, locking markets...');
+        // console.log('Game is running, locking markets...'); // This logs too much
         lockMarkets();
     } else if (!gameRunning && marketsLocked && gameStarted) {
-        console.log('Game stopped, unlocking markets...');
-        unlockMarkets();
-
-        // If match is completely finished (not just halftime)
-        if (gameHalf === 2 && timer >= halftimeSeconds * 2) {
-            // Settle bets with match result
-            const matchResult = {
-                winner: score.red > score.blue ? 'red' : score.blue > score.red ? 'blue' : 'draw',
-                homeGoals: score.red,
-                awayGoals: score.blue,
-                totalGoals: score.red + score.blue,
-                firstHalfGoals: 0 // This would need to be tracked during the match
-            };
-
-            settleBets(matchResult);
+         // This condition is tricky because halftime also has gameRunning = false
+         // We only want to unlock if it's NOT halftime
+        if (gameHalf === 1 && timer < halftimeSeconds + injuryTime.first) {
+             // Game paused but not halftime, e.g. after goal
+             console.log('Game paused, unlocking markets...');
+             unlockMarkets();
         }
+        
     }
-
-    // Don't interfere with betting if game is initialized but not running
-    // This allows betting during the pre-game period
 }
 
 // Check game state periodically
@@ -2518,7 +2345,7 @@ function startBettingTimer(seconds = 20) {
     console.log('Starting betting countdown interval...');
     bettingTimer = setInterval(() => {
         bettingTimeLeft--;
-        console.log(`Betting time left: ${bettingTimeLeft} seconds`);
+        // console.log(`Betting time left: ${bettingTimeLeft} seconds`); // This logs too much
         updateBettingTimerDisplay();
 
         if (bettingTimeLeft <= 10 && bettingTimeLeft > 0) {
@@ -2546,14 +2373,26 @@ function closeBettingWindow() {
     // Lock markets and show closed message
     lockMarkets();
     showBettingStatus('closed');
-    showBetMessage('Betting window closed - match starting soon!', 'error');
-
+    
+    // --- START MODIFICATION ---
     // Start the game after betting window closes
-    if (!gameStarted && !gameRunning) {
+    if (!gameStarted && !gameRunning) { // Pre-match
+        showBetMessage('Betting window closed - match starting soon!', 'error');
         showGameMessage("KICK OFF!\nMatch Starting...", 1000);
         setTimeout(() => startPlay(), 1000);
+    } else if (gameHalf === 1 && !gameRunning) { // Halftime check
+        // This is the new logic!
+        showBetMessage('Halftime betting closed - 2nd half starting!', 'error');
+        gameHalf = 2;
+        timer = halftimeSeconds; // Set timer to 45:00
+        injuryTimeStarted = false;
+        resetToCenter();
+        showGameMessage("SECOND HALF!\nStarting...", 1000);
+        setTimeout(() => startPlay(), 1000); // Start 2nd half
     }
+    // --- END MODIFICATION ---
 }
+
 
 function updateBettingTimerDisplay() {
     const timerElement = document.getElementById('bettingTimer');
@@ -2656,11 +2495,12 @@ function toggleBettingMarkets(enabled) {
             marketsElement.style.visibility = 'visible';
             marketsElement.style.opacity = '1';
 
-            // Enable all betting buttons
+            // Enable all betting buttons that aren't settled
             const bettingButtons = marketsElement.querySelectorAll('.odds-btn');
             bettingButtons.forEach(btn => {
-                btn.disabled = false;
-                btn.style.pointerEvents = 'auto';
+                if (!btn.disabled) { // Only re-enable if not explicitly disabled (e.g., settled)
+                    btn.style.pointerEvents = 'auto';
+                }
             });
 
             console.log('Betting markets enabled');
@@ -2671,7 +2511,6 @@ function toggleBettingMarkets(enabled) {
             // Disable all betting buttons
             const bettingButtons = marketsElement.querySelectorAll('.odds-btn');
             bettingButtons.forEach(btn => {
-                btn.disabled = true;
                 btn.style.pointerEvents = 'none';
             });
 
@@ -2682,110 +2521,251 @@ function toggleBettingMarkets(enabled) {
     }
 }
 
-function animateOddsChange() {
-    const oddElements = document.querySelectorAll('.odds-value');
-    oddElements.forEach(element => {
-        if (element) {
-            element.style.transform = 'scale(1.1)';
-            element.style.color = '#ff6b6b';
-            setTimeout(() => {
-                element.style.transform = 'scale(1)';
-                element.style.color = '#ffd700';
-            }, 300);
-        }
-    });
-}
 
-function startMatchCountdown(seconds = 20) {
-    let countdownSeconds = seconds;
-    const countdownElement = document.getElementById('matchCountdown');
+/* --- NEW POISSON-BASED LIVE ODDS FUNCTIONS --- */
 
-    if (!countdownElement) return;
-
-    const countdownInterval = setInterval(() => {
-        if (countdownSeconds > 0) {
-            countdownElement.textContent = `Next match in: ${countdownSeconds}s`;
-            countdownSeconds--;
+/**
+ * Caches factorial results for performance.
+ */
+const factorial = (function () {
+    const cache = { 0: 1, 1: 1 };
+    function f(n) {
+        if (n in cache) {
+            return cache[n];
         } else {
-            countdownElement.textContent = 'Match starting...';
-            clearInterval(countdownInterval);
+            if (n < 0) return NaN;
+            if (n > 170) return Infinity; // Handle large numbers
+            let result = 1;
+            for (let i = n; i > 1; i--) {
+                result *= i;
+            }
+            cache[n] = result;
+            return result;
         }
-    }, 1000);
-}
-
-function stopMatchCountdown() {
-    const countdownElement = document.getElementById('matchCountdown');
-    if (countdownElement) {
-        countdownElement.textContent = 'Match in progress...';
     }
+    return f;
+})();
+
+/**
+ * Calculates the Poisson probability of exactly k events (goals)
+ * given an average expectancy (lambda).
+ * P(k, λ) = (e^-λ * λ^k) / k!
+ * @param {number} k - The number of goals (integer).
+ * @param {number} lambda - The average expected goals.
+ * @returns {number} - The probability (0-1).
+ */
+function poissonProbability(k, lambda) {
+    if (k < 0 || lambda < 0) return 0;
+    k = Math.floor(k); // Ensure k is an integer
+    
+    // Use Math.exp(-lambda) which is more numerically stable than Math.pow(Math.E, -lambda)
+    const part1 = Math.exp(-lambda);
+    const part2 = Math.pow(lambda, k);
+    const part3 = factorial(k);
+    
+    if (part3 === Infinity) return 0; // Prevent division by infinity
+
+    return (part1 * part2) / part3;
 }
 
-// Enhanced finishMatch function - temporarily disabled for debugging
-/*
-const enhancedOriginalFinishMatch = finishMatch;
-finishMatch = function () {
-    // Call original finishMatch first to properly complete the match
-    enhancedOriginalFinishMatch.call(this);
+/**
+ * Calculates and displays updated "live" odds at halftime
+ * using a Poisson Distribution model.
+ */
+function updateLiveOdds() {
+    console.log(`Updating live odds using Poisson. HT Score: ${score.red} - ${score.blue}`);
+    
+    // --- 1. Get Base Data ---
+    // Get current score
+    const currentHomeGoals = score.red;
+    const currentAwayGoals = score.blue;
 
-    // Only settle bets after match is completely finished
-    setTimeout(() => {
-        const matchResult = {
-            homeGoals: currentMatch.homeGoals,
-            awayGoals: currentMatch.awayGoals,
-            totalGoals: currentMatch.totalGoals,
-            firstHalfHomeGoals: currentMatch.firstHalfHomeGoals,
-            firstHalfAwayGoals: currentMatch.firstHalfAwayGoals,
-            firstHalfGoals: currentMatch.firstHalfHomeGoals + currentMatch.firstHalfAwayGoals,
-            winner: currentMatch.result === 'Home Win' ? 'red' : currentMatch.result === 'Away Win' ? 'blue' : 'draw'
-        };
+    // Get 2nd Half Goal Expectancy (Lambda) from historical stats
+    // These are the *expected* goals for the 2nd half only.
+    const lambda_home_remaining = historicalStats.avgHomeGoals - historicalStats.avgFirstHalfHome; // ~0.59
+    const lambda_away_remaining = historicalStats.avgAwayGoals - historicalStats.avgFirstHalfAway; // ~0.613
 
-        // Settle bets only if there are active bets
-        if (activeBets.length > 0) {
-            settleBets(matchResult);
-        }
+    // --- 2. Calculate Probability Matrix ---
+    let totalHomeWinProb = 0;
+    let totalDrawProb = 0;
+    let totalAwayWinProb = 0;
+    let totalOver25Prob = 0;
+    let totalBTTS_Yes_Prob = 0;
+    let totalProbSum = 0; // For normalization
 
-        // Re-enable betting markets and start new betting window
-        setTimeout(() => {
-            toggleBettingMarkets(true);
-            unlockMarkets();
+    const max_goals_to_calc = 8; // Calculate up to 8 more goals for each team
 
-            // Only start new betting window if not in auto mode or if there are more matches
-            if (!autoMode || (autoMode && currentMatchNumber < totalMatches)) {
-                startBettingTimer(20); // 20 seconds to place bets
-                showBetMessage('New betting window opened - place your bets!', 'info');
+    // Pre-calculate Poisson probabilities for each team to save computation
+    let homeProbs = [];
+    let awayProbs = [];
+    for (let k = 0; k <= max_goals_to_calc; k++) {
+        homeProbs[k] = poissonProbability(k, lambda_home_remaining);
+        awayProbs[k] = poissonProbability(k, lambda_away_remaining);
+    }
+
+    // --- 3. Sum Probabilities for Each Market ---
+    for (let k_home = 0; k_home <= max_goals_to_calc; k_home++) {
+        for (let k_away = 0; k_away <= max_goals_to_calc; k_away++) {
+            
+            // Probability of (k_home) more home goals AND (k_away) more away goals
+            const prob_this_outcome = homeProbs[k_home] * awayProbs[k_away];
+            
+            if (prob_this_outcome === 0) continue; // Skip if probability is negligible
+
+            // Calculate the final score based on this outcome
+            const final_home_goals = currentHomeGoals + k_home;
+            const final_away_goals = currentAwayGoals + k_away;
+            const final_total_goals = final_home_goals + final_away_goals;
+
+            // --- A. 1x2 Market (Full Time) ---
+            if (final_home_goals > final_away_goals) {
+                totalHomeWinProb += prob_this_outcome;
+            } else if (final_home_goals < final_away_goals) {
+                totalAwayWinProb += prob_this_outcome;
+            } else {
+                totalDrawProb += prob_this_outcome;
             }
 
-            // Update odds after each match (simulate market movement)
-            animateOddsChange();
-            updateBettingOdds();
-        }, 1000);
+            // --- B. Total Goals (Over/Under 2.5) ---
+            if (final_total_goals > 2.5) {
+                totalOver25Prob += prob_this_outcome;
+            }
 
-        // Start countdown for next match if in auto mode
-        if (autoMode && currentMatchNumber < totalMatches) {
-            startMatchCountdown(20);
+            // --- C. BTTS (Both Teams to Score) ---
+            if (final_home_goals > 0 && final_away_goals > 0) {
+                totalBTTS_Yes_Prob += prob_this_outcome;
+            }
+            
+            totalProbSum += prob_this_outcome;
         }
-    }, 500);
-};
-*/
-
-// Enhanced startNextMatch function - temporarily disabled for debugging
-/*
-const enhancedOriginalStartNextMatch = startNextMatch;
-startNextMatch = function () {
-    // Stop any active betting countdown
-    if (typeof stopMatchCountdown === 'function') {
-        stopMatchCountdown();
     }
 
-    // Close any active betting windows
-    if (bettingWindowOpen) {
-        closeBettingWindow();
+    // --- 4. Normalize and Update Odds ---
+
+    // --- 1x2 Market ---
+    // Normalize probabilities (to account for max_goals_to_calc cap)
+    const finalHomeProb = totalHomeWinProb / totalProbSum;
+    const finalDrawProb = totalDrawProb / totalProbSum;
+    const finalAwayProb = totalAwayWinProb / totalProbSum;
+    
+    updateOddElement('redWinOdd', 'button[data-outcome="red-win"]', finalHomeProb);
+    updateOddElement('drawOdd', 'button[data-outcome="draw"]', finalDrawProb);
+    updateOddElement('blueWinOdd', 'button[data-outcome="blue-win"]', finalAwayProb);
+
+
+    // --- Total Goals O/U 2.5 ---
+    const currentTotalGoals = currentHomeGoals + currentAwayGoals;
+    if (currentTotalGoals > 2.5) {
+        // Market is already settled as Over
+        disableMarketButton(document.querySelector('button[data-outcome="over-2.5"]'), "Settled (Over)");
+        disableMarketButton(document.querySelector('button[data-outcome="under-2.5"]'), "Settled (Over)");
+    } else {
+        // Normalize O/U 2.5 probability
+        const finalOver25Prob = totalOver25Prob / totalProbSum;
+        const finalUnder25Prob = 1.0 - finalOver25Prob;
+        
+        updateOddElement('over25Odd', 'button[data-outcome="over-2.5"]', finalOver25Prob);
+        updateOddElement('under25Odd', 'button[data-outcome="under-2.5"]', finalUnder25Prob);
+    }
+    
+    // --- BTTS Market ---
+    if (currentHomeGoals > 0 && currentAwayGoals > 0) {
+        // Market is already settled as YES
+        disableMarketButton(document.querySelector('button[data-outcome="yes"]'), "Settled (Yes)");
+        disableMarketButton(document.querySelector('button[data-outcome="no"]'), "Settled (Yes)");
+    } else {
+        // Normalize BTTS probability
+        const finalBTTS_Yes_Prob = totalBTTS_Yes_Prob / totalProbSum;
+        const finalBTTS_No_Prob = 1.0 - finalBTTS_Yes_Prob;
+
+        updateOddElement('bttsYesOdd', 'button[data-outcome="yes"]', finalBTTS_Yes_Prob);
+        updateOddElement('bttsNoOdd', 'button[data-outcome="no"]', finalBTTS_No_Prob);
     }
 
-    // Call original function
-    enhancedOriginalStartNextMatch.call(this);
-};
-*/
+    // --- First Half Goals Market ---
+    // This market is always closed at halftime.
+    document.querySelectorAll('button[data-market="fh-goals"]').forEach(btn => {
+        disableMarketButton(btn, "Market Closed");
+    });
+
+    // Animate the odds changes
+    animateOddsChange();
+}
+
+/**
+ * Helper function to update a single odd element's text and data-odd.
+ * @param {string} elementId - The ID of the span/div holding the odds value.
+ * @param {string} buttonSelector - The CSS selector for the button.
+ * @param {number} probability - The new probability (0-1).
+ */
+function updateOddElement(elementId, buttonSelector, probability) {
+    const oddSpan = document.getElementById(elementId);
+    const oddButton = document.querySelector(buttonSelector);
+
+    if (!oddSpan || !oddButton) {
+        console.warn(`Element not found for ${elementId} or ${buttonSelector}`);
+        return;
+    }
+
+    // Ensure probability is within a valid range to avoid extreme odds
+    const saneProbability = Math.max(0.0001, Math.min(0.9999, probability));
+    const newOdd = calculateOdds(saneProbability, 0.05); // Use existing calculateOdds function
+    const newOddStr = newOdd.toFixed(2);
+    
+    // Don't update if odd is unrealistic (e.g., > 1000)
+    if (newOdd > 1000) {
+        disableMarketButton(oddButton, "N/A");
+        return;
+    }
+
+    oddSpan.textContent = newOddStr;
+    oddButton.dataset.odd = newOddStr;
+    
+    // Re-enable button in case it was disabled (e.g., for a new match)
+    oddButton.disabled = false;
+    oddButton.classList.remove('suspended');
+    oddButton.style.pointerEvents = 'auto';
+    
+    // Reset selection text
+    const selectionEl = oddButton.querySelector('.selection-name') || oddButton.querySelector('.selection');
+    if (selectionEl) {
+        // Reset text from "Settled" etc. This is a bit manual,
+        // might need a better way to store original text.
+        const outcome = oddButton.dataset.outcome;
+        if (outcome === 'red-win') selectionEl.textContent = 'Red Team';
+        else if (outcome === 'blue-win') selectionEl.textContent = 'Blue Team';
+        else if (outcome === 'draw') selectionEl.textContent = 'Draw';
+        else if (outcome.includes('over-2.5')) selectionEl.textContent = 'Over 2.5';
+        else if (outcome.includes('under-2.5')) selectionEl.textContent = 'Under 2.5';
+        else if (outcome === 'yes') selectionEl.textContent = 'Yes';
+        else if (outcome === 'no') selectionEl.textContent = 'No';
+    }
+}
+
+/**
+ * Helper function to disable a market button.
+ * @param {HTMLElement} buttonElement - The button to disable.
+ *S @param {string} text - The text to display (e.g., "Settled").
+ */
+function disableMarketButton(buttonElement, text) {
+    if (!buttonElement) return;
+    
+    buttonElement.disabled = true;
+    buttonElement.classList.add('suspended');
+    buttonElement.style.pointerEvents = 'none';
+    
+    const selectionEl = buttonElement.querySelector('.selection-name') || buttonElement.querySelector('.selection');
+    if (selectionEl) {
+        selectionEl.textContent = text;
+    }
+    const oddsEl = buttonElement.querySelector('.odds-value');
+    if (oddsEl) {
+        oddsEl.textContent = '-';
+    }
+}
+
+
+/* --- GAME OVERLAY FUNCTIONS --- */
 
 // Update overlay betting status
 function updateOverlayBettingStatus(status, timeLeft = null) {
@@ -2875,8 +2855,4 @@ function syncOverlayWithGameState() {
         updateOverlayBettingStatus('closed');
     }
 }
-
-
-
-
 
