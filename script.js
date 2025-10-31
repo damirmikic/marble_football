@@ -1351,6 +1351,14 @@ function startNextMatch() {
     // Update displays
     updateScore();
 
+    // --- START MODIFICATION ---
+    // Reset odds to pre-match values for the new match
+    if (typeof updateBettingOdds === 'function') {
+        console.log('Resetting odds to pre-match values for next match.');
+        updateBettingOdds();
+    }
+    // --- END MODIFICATION ---
+
     // Start betting window for the new match
     showGameMessage("NEW MATCH!\nBetting is open...", 3000);
 
