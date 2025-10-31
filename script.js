@@ -2124,7 +2124,16 @@ function updateActiveBets() {
         return;
     }
 
-    betsList.innerHTML = activeBets.map(bet => `
+    betsList.innerHTML = activeBets.map(bet => {
+        // --- ADDED TIMESTAMP ---
+        const timestamp = new Date(bet.timestamp).toLocaleString('en-US', {
+            hour: '2-digit',
+            minute: '2-digit',
+            second: '2-digit',
+            hour12: true
+        });
+
+        return `
         <div class="bet-item ${bet.status}">
             <div class="bet-details">
                 <div class="bet-market">${bet.marketName} (Match ${bet.matchNumber})</div>
@@ -2135,10 +2144,14 @@ function updateActiveBets() {
                 <div class="bet-potential-return">
                     Return: $${(bet.status === 'won') ? bet.potentialReturn.toFixed(2) : (bet.status === 'pending' ? bet.potentialReturn.toFixed(2) : '0.00')}
                 </div>
+                <!-- NEW: Timestamp -->
+                <div class="bet-timestamp">
+                    Placed: ${timestamp}
+                </div>
             </div>
             <div class="bet-status">${bet.status}</div>
         </div>
-    `).join('');
+    `}).join('');
 }
 
 // --- NEW: Update Bet History Display ---
@@ -2151,8 +2164,18 @@ function updateBetHistory() {
         return;
     }
 
-    // Show newest bets first
-    historyList.innerHTML = betHistory.map(bet => `
+    // Show newest bets first (since we use unshift())
+    historyList.innerHTML = betHistory.map(bet => {
+        // --- ADDED TIMESTAMP ---
+        const timestamp = new Date(bet.timestamp).toLocaleString('en-US', {
+            month: 'short',
+            day: 'numeric',
+            hour: '2-digit',
+            minute: '2-digit',
+            hour12: true
+        });
+
+        return `
         <div class="bet-item ${bet.status}">
             <div class="bet-details">
                 <div class="bet-market">${bet.marketName} (Match ${bet.matchNumber})</div>
@@ -2163,10 +2186,14 @@ function updateBetHistory() {
                 <div class="bet-potential-return">
                     Return: $${(bet.status === 'won') ? bet.potentialReturn.toFixed(2) : '0.00'}
                 </div>
+                <!-- NEW: Timestamp -->
+                <div class="bet-timestamp">
+                    Settled: ${timestamp}
+                </div>
             </div>
             <div class="bet-status">${bet.status}</div>
         </div>
-    `).join(''); // No reverse, as we use unshift()
+    `}).join('');
 }
 
 // Lock/unlock markets
@@ -2210,6 +2237,7 @@ function settleBets(matchResult) {
         return;
     }
     
+    // --- MODIFIED: Correctly partition bets ---
     // Find bets from the *current match* that are still pending
     const betsToSettle = activeBets.filter(bet => 
         bet.matchNumber === currentMatch.matchNumber && bet.status === 'pending'
@@ -2222,6 +2250,9 @@ function settleBets(matchResult) {
 
     if (betsToSettle.length === 0) {
         console.log('No active bets to settle for this match.');
+        // Ensure activeBets is correctly set to remaining bets
+        activeBets = otherActiveBets;
+        updateActiveBets();
         return;
     }
 
@@ -2279,7 +2310,7 @@ function settleBets(matchResult) {
     activeBets = otherActiveBets; // Update active bets to only be other bets
 
     updateBalanceDisplay();
-    updateActiveBets(); // Update the (now empty) active bets list
+    updateActiveBets(); // Update the (now empty or smaller) active bets list
     updateBetHistory(); // Update the history list
 }
 
@@ -2845,6 +2876,13 @@ function updateOddElement(elementId, buttonSelector, probability) {
         else if (outcome === 'no') selectionEl.textContent = 'No';
         else if (outcome === 'red-clean-sheet') selectionEl.textContent = 'Red Clean Sheet';
         else if (outcome === 'blue-clean-sheet') selectionEl.textContent = 'Blue Clean Sheet';
+        // Handle fh-goals reset (though they get disabled)
+        else if (outcome === 'over-0.5') selectionEl.textContent = 'Over 0.5';
+        else if (outcome === 'under-0.5') selectionEl.textContent = 'Under 0.5';
+        else if (outcome === 'over-1.5') selectionEl.textContent = 'Over 1.5';
+        else if (outcome === 'under-1.5') selectionEl.textContent = 'Under 1.5';
+        else if (outcome === 'over-2.5') selectionEl.textContent = 'Over 2.5';
+        else if (outcome === 'under-2.5') selectionEl.textContent = 'Under 2.5';
     }
 }
 
@@ -2961,4 +2999,3 @@ function syncOverlayWithGameState() {
         updateOverlayBettingStatus('closed');
     }
 }
-
