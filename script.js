@@ -632,14 +632,26 @@ function updateTimer(elapsedMS) {
         injuryTimeStarted = true;
         showGameMessage(`+${injuryTime.first} INJURY TIME`, 2000);
     } else if (gameHalf === 1 && timer >= halftimeSeconds + injuryTime.first) {
-        // Start Half 2
-        gameHalf = 2;
-        timer = halftimeSeconds; // Continue from 45 to 90
-        injuryTimeStarted = false;
-        gameRunning = false;
-        showGameMessage("HALF TIME!", 2000);
-        resetToCenter();
-        setTimeout(() => startPlay(), 2000); // Start after 2 seconds
+        // --- START HALFTIME BETTING LOGIC ---
+        gameRunning = false; // Stop the game
+        showGameMessage("HALF TIME!", 3000);
+
+        // Update odds for 2nd half, then open window
+        if (typeof updateLiveOdds === 'function') {
+            updateLiveOdds();
+        }
+
+        // Open the 15-second betting window
+        if (typeof startBettingTimer === 'function') {
+            startBettingTimer(15); // Open for 15 seconds
+            if (typeof showBetMessage === 'function') {
+                showBetMessage('Halftime! Place your live bets now!', 'info');
+            }
+        }
+        
+        // The 2nd half will now be started by closeBettingWindow() when the timer ends
+        // --- END HALFTIME BETTING LOGIC ---
+        
     } else if (gameHalf === 2 && timer >= halftimeSeconds * 2 && !injuryTimeStarted) {
         // Generate injury time for second half (3-6 seconds)
         injuryTime.second = Math.floor(Math.random() * 4) + 3;
@@ -649,7 +661,7 @@ function updateTimer(elapsedMS) {
         // Game Over
         gameRunning = false;
         gameStarted = false;
-        finishMatch();
+        finishMatch(); // This function now handles bet settlement
 
         if (autoMode && currentMatchNumber < totalMatches && !matchTransitioning) {
             setTimeout(() => startNextMatch(), 1000);
@@ -661,7 +673,8 @@ function updateTimer(elapsedMS) {
         } else if (!autoMode) {
             showGameMessage(`FULL TIME!\nRed ${score.red} - ${score.blue} Blue`, 3000);
             // Start next match with betting after showing final score
-            setTimeout(() => startNextMatch(), 3000);
+            // The 3sec delay allows time for bet settlement UI to appear
+            setTimeout(() => startNextMatch(), 3000); 
         }
     }
 
@@ -2698,6 +2711,7 @@ function syncOverlayWithGameState() {
         updateOverlayBettingStatus('closed');
     }
 }
+
 
 
 
