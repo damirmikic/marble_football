@@ -13,12 +13,12 @@ const goalScore = document.getElementById('goalScore');
 // Game constants
 const SCREEN_WIDTH = 800;
 const SCREEN_HEIGHT = 500;
-const PLAYER_RADIUS = 15; // Larger circles
-const BALL_RADIUS = 8; // Ball radius
+const PLAYER_RADIUS = 13; 
+const BALL_RADIUS = 8; 
 const GOAL_WIDTH = 10;
 const GOAL_HEIGHT = 100;
-const MAX_PLAYER_SPEED = 4; // Increased from 2 to 4 for faster gameplay
-const MAX_BALL_SPEED = 8; // Increased from 5 to 8 for faster ball movement
+const MAX_PLAYER_SPEED = 5; 
+const MAX_BALL_SPEED = 10; 
 
 // Field dimensions
 const PENALTY_BOX_WIDTH = 80; // 16-yard box width
@@ -2999,3 +2999,4 @@ function syncOverlayWithGameState() {
         updateOverlayBettingStatus('closed');
     }
 }
+
