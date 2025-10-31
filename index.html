@@ -271,11 +271,11 @@
                             <div class="odds-container specials-odds">
                                 <button class="odds-btn wide" data-market="specials" data-outcome="red-clean-sheet" data-odd="3.20">
                                     <span class="selection">Red Clean Sheet</span>
-                                    <span class="odds-value">3.20</span>
+                                    <span class="odds-value" id="redCleanSheetOdd">3.20</span>
                                 </button>
                                 <button class="odds-btn wide" data-market="specials" data-outcome="blue-clean-sheet" data-odd="3.10">
                                     <span class="selection">Blue Clean Sheet</span>
-                                    <span class="odds-value">3.10</span>
+                                    <span class="odds-value" id="blueCleanSheetOdd">3.10</span>
                                 </button>
                             </div>
                         </div>
@@ -295,6 +295,14 @@
                 <h3>🎲 Active Bets</h3>
                 <div class="bets-list" id="betsList">
                     <div class="no-bets">No active bets</div>
+                </div>
+            </div>
+            
+            <!-- NEW: Bet History Section -->
+            <div class="active-bets" id="betHistory">
+                <h3>📜 Bet History</h3>
+                <div class="bets-list" id="betHistoryList">
+                    <div class="no-bets">No bet history</div>
                 </div>
             </div>
 
