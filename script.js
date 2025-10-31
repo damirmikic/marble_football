@@ -604,16 +604,24 @@ function isInRightGoalBox(x, y, radius) {
 function enforceGoalBoxRestriction(player) {
     if (player.isGoalkeeper) return; // Goalkeepers can be in goal boxes
 
-    if (player.team === 'red' && isInRightGoalBox(player.x, player.y, player.radius)) {
-        // Red player in blue goal box - push them out
-        player.x = SCREEN_WIDTH - GOAL_BOX_WIDTH - player.radius - 1;
-        player.vx = Math.min(player.vx, 0); // Don't let them move further right
-    } else if (player.team === 'blue' && isInLeftGoalBox(player.x, player.y, player.radius)) {
-        // Blue player in red goal box - push them out
+    // --- START MODIFICATION: Stricter 6-yard box rule ---
+    // Check if player is in *either* 6-yard box
+
+    const inLeftBox = isInLeftGoalBox(player.x, player.y, player.radius);
+    const inRightBox = isInRightGoalBox(player.x, player.y, player.radius);
+
+    if (inLeftBox) {
+        // Player is in the left box, push them right
         player.x = GOAL_BOX_WIDTH + player.radius + 1;
-        player.vx = Math.max(player.vx, 0); // Don't let them move further left
+        player.vx = Math.abs(player.vx) || 0.5; // Force push right
+    } else if (inRightBox) {
+        // Player is in the right box, push them left
+        player.x = SCREEN_WIDTH - GOAL_BOX_WIDTH - player.radius - 1;
+        player.vx = -Math.abs(player.vx) || -0.5; // Force push left
     }
+    // --- END MODIFICATION ---
 }
+
 
 function updateTimer(elapsedMS) {
     if (!gameRunning) return;
@@ -1759,6 +1767,13 @@ function updateBettingOdds() {
     updateOddElement('fhOver05Odd', 'button[data-outcome="over-0.5"]', fhOver05Prob);
     updateOddElement('fhUnder05Odd', 'button[data-outcome="under-0.5"]', fhUnder05Prob);
 
+    // --- NEW: Clean Sheet Market (Pre-match) ---
+    const redCleanSheetProb = stats.awayGoals[0] / total;
+    const blueCleanSheetProb = stats.homeGoals[0] / total;
+    updateOddElement('redCleanSheetOdd', 'button[data-outcome="red-clean-sheet"]', redCleanSheetProb);
+    updateOddElement('blueCleanSheetOdd', 'button[data-outcome="blue-clean-sheet"]', blueCleanSheetProb);
+
+
     // Re-enable all fh-goals buttons (as this is pre-match)
     document.querySelectorAll('button[data-market="fh-goals"]').forEach(btn => {
         btn.disabled = false;
@@ -1803,7 +1818,10 @@ function stopMatchCountdown() {
         clearInterval(countdownInterval);
         countdownInterval = null;
     }
-    document.getElementById('matchCountdown').textContent = 'Match in progress...';
+    const countdownElement = document.getElementById('matchCountdown');
+    if(countdownElement) {
+        countdownElement.textContent = 'Match in progress...';
+    }
 }
 
 // Add betting odds animation
@@ -1822,6 +1840,7 @@ function animateOddsChange() {
 // Betting system variables
 let userBalance = 1000.00;
 let activeBets = [];
+let betHistory = []; // --- NEW: For Bet History ---
 let currentBet = null;
 let marketsLocked = false;
 let bettingTimer = null;
@@ -1879,6 +1898,7 @@ function initializeBetting() {
     setupBettingEventListeners();
     updateBetslip();
     updateBettingOdds(); // Also update odds
+    updateBetHistory(); // --- NEW: Render bet history on load ---
 
     // Ensure betting markets are visible and enabled by default
     const marketsElement = document.getElementById('bettingMarkets');
@@ -2047,6 +2067,7 @@ function placeBet() {
     // Create active bet
     const activeBet = {
         id: Date.now(),
+        matchNumber: currentMatch.matchNumber, // --- NEW: Track match number
         market: currentBet.market,
         outcome: currentBet.outcome,
         selection: currentBet.selection,
@@ -2106,7 +2127,7 @@ function updateActiveBets() {
     betsList.innerHTML = activeBets.map(bet => `
         <div class="bet-item ${bet.status}">
             <div class="bet-details">
-                <div class="bet-market">${bet.marketName}</div>
+                <div class="bet-market">${bet.marketName} (Match ${bet.matchNumber})</div>
                 <div class="bet-selection-details">${bet.selection}</div>
                 <div class="bet-stake-odds">
                     Stake: $${bet.stake.toFixed(2)} @ ${bet.odds.toFixed(2)}
@@ -2118,6 +2139,34 @@ function updateActiveBets() {
             <div class="bet-status">${bet.status}</div>
         </div>
     `).join('');
+}
+
+// --- NEW: Update Bet History Display ---
+function updateBetHistory() {
+    const historyList = document.getElementById('betHistoryList');
+    if (!historyList) return; // Guard clause
+
+    if (betHistory.length === 0) {
+        historyList.innerHTML = '<div class="no-bets">No bet history</div>';
+        return;
+    }
+
+    // Show newest bets first
+    historyList.innerHTML = betHistory.map(bet => `
+        <div class="bet-item ${bet.status}">
+            <div class="bet-details">
+                <div class="bet-market">${bet.marketName} (Match ${bet.matchNumber})</div>
+                <div class="bet-selection-details">${bet.selection}</div>
+                <div class="bet-stake-odds">
+                    Stake: $${bet.stake.toFixed(2)} @ ${bet.odds.toFixed(2)}
+                </div>
+                <div class="bet-potential-return">
+                    Return: $${(bet.status === 'won') ? bet.potentialReturn.toFixed(2) : '0.00'}
+                </div>
+            </div>
+            <div class="bet-status">${bet.status}</div>
+        </div>
+    `).join(''); // No reverse, as we use unshift()
 }
 
 // Lock/unlock markets
@@ -2156,16 +2205,29 @@ function unlockMarkets() {
 // Settle bets after match
 function settleBets(matchResult) {
     // Safety check - don't settle if no result
-    if (!matchResult || activeBets.length === 0) {
-        console.log('Skipping bet settlement - no result or no bets');
+    if (!matchResult) {
+        console.log('Skipping bet settlement - no result provided');
+        return;
+    }
+    
+    // Find bets from the *current match* that are still pending
+    const betsToSettle = activeBets.filter(bet => 
+        bet.matchNumber === currentMatch.matchNumber && bet.status === 'pending'
+    );
+    
+    // Keep any bets from *future* matches (if multi-match betting was added)
+    const otherActiveBets = activeBets.filter(bet => 
+        bet.matchNumber !== currentMatch.matchNumber || bet.status !== 'pending'
+    );
+
+    if (betsToSettle.length === 0) {
+        console.log('No active bets to settle for this match.');
         return;
     }
 
-    console.log('Settling bets with result:', matchResult);
+    console.log(`Settling ${betsToSettle.length} bets for match ${currentMatch.matchNumber}...`);
 
-    activeBets.forEach(bet => {
-        if (bet.status !== 'pending') return;
-
+    betsToSettle.forEach(bet => {
         let won = false;
 
         // Check bet outcome based on match result
@@ -2196,7 +2258,10 @@ function settleBets(matchResult) {
                 if (bet.outcome.startsWith('under') && fhGoals < fhLine) won = true;
                 break;
             
-            // Add cases for other markets like 'specials' if needed
+            case 'specials':
+                if (bet.outcome === 'red-clean-sheet' && matchResult.awayGoals === 0) won = true;
+                if (bet.outcome === 'blue-clean-sheet' && matchResult.homeGoals === 0) won = true;
+                break;
         }
 
         if (won) {
@@ -2209,9 +2274,15 @@ function settleBets(matchResult) {
         }
     });
 
+    // --- NEW: Move settled bets to history ---
+    betHistory.unshift(...betsToSettle); // Add to start of history array
+    activeBets = otherActiveBets; // Update active bets to only be other bets
+
     updateBalanceDisplay();
-    updateActiveBets();
+    updateActiveBets(); // Update the (now empty) active bets list
+    updateBetHistory(); // Update the history list
 }
+
 
 // Reinitialize betting after dynamic content updates
 function reinitializeBetting() {
@@ -2690,6 +2761,31 @@ function updateLiveOdds() {
         updateOddElement('bttsNoOdd', 'button[data-outcome="no"]', finalBTTS_No_Prob);
     }
 
+    // --- NEW: Clean Sheet Market (Halftime) ---
+    const redCleanSheetButton = document.querySelector('button[data-outcome="red-clean-sheet"]');
+    const blueCleanSheetButton = document.querySelector('button[data-outcome="blue-clean-sheet"]');
+
+    // Red Clean Sheet (Blue scores 0)
+    if (currentAwayGoals > 0) {
+        // Red cannot get a clean sheet if Blue already scored
+        disableMarketButton(redCleanSheetButton, "Settled (No)");
+    } else {
+        // Prob of Red clean sheet = Prob of Blue scoring 0 goals in 2nd half
+        const redCleanSheetProb = poissonProbability(0, lambda_away_remaining);
+        // We don't need to normalize this, it's a direct probability
+        updateOddElement('redCleanSheetOdd', 'button[data-outcome="red-clean-sheet"]', redCleanSheetProb);
+    }
+
+    // Blue Clean Sheet (Red scores 0)
+    if (currentHomeGoals > 0) {
+        // Blue cannot get a clean sheet if Red already scored
+        disableMarketButton(blueCleanSheetButton, "Settled (No)");
+    } else {
+        // Prob of Blue clean sheet = Prob of Red scoring 0 goals in 2nd half
+        const blueCleanSheetProb = poissonProbability(0, lambda_home_remaining);
+        updateOddElement('blueCleanSheetOdd', 'button[data-outcome="blue-clean-sheet"]', blueCleanSheetProb);
+    }
+
     // --- First Half Goals Market ---
     // This market is always closed at halftime.
     document.querySelectorAll('button[data-market="fh-goals"]').forEach(btn => {
@@ -2747,13 +2843,15 @@ function updateOddElement(elementId, buttonSelector, probability) {
         else if (outcome.includes('under-2.5')) selectionEl.textContent = 'Under 2.5';
         else if (outcome === 'yes') selectionEl.textContent = 'Yes';
         else if (outcome === 'no') selectionEl.textContent = 'No';
+        else if (outcome === 'red-clean-sheet') selectionEl.textContent = 'Red Clean Sheet';
+        else if (outcome === 'blue-clean-sheet') selectionEl.textContent = 'Blue Clean Sheet';
     }
 }
 
 /**
  * Helper function to disable a market button.
  * @param {HTMLElement} buttonElement - The button to disable.
- *S @param {string} text - The text to display (e.g., "Settled").
+ * @param {string} text - The text to display (e.g., "Settled").
  */
 function disableMarketButton(buttonElement, text) {
     if (!buttonElement) return;
