@@ -780,8 +780,8 @@ nhanced Betslip Styling */
     color: #6b7280;
     font-style: italic;
     padding: 20px;
-}/* 
-Betting Status and Timer Styling */
+}
+/* Betting Status and Timer Styling */
 .betting-status-bar {
     background: linear-gradient(135deg, #f8f9fa 0%, #e9ecef 100%);
     border-bottom: 1px solid #dee2e6;
@@ -824,8 +824,15 @@ Betting Status and Timer Styling */
 }
 
 @keyframes pulse-status {
-    0%, 100% { opacity: 1; }
-    50% { opacity: 0.7; }
+
+    0%,
+    100% {
+        opacity: 1;
+    }
+
+    50% {
+        opacity: 0.7;
+    }
 }
 
 .status-text {
@@ -873,11 +880,13 @@ Betting Status and Timer Styling */
 }
 
 @keyframes timer-urgent {
-    0%, 100% { 
+    0%,
+    100% {
         transform: scale(1);
         box-shadow: 0 0 0 0 rgba(220, 53, 69, 0.4);
     }
-    50% { 
+
+    50% {
         transform: scale(1.05);
         box-shadow: 0 0 0 4px rgba(220, 53, 69, 0.2);
     }
@@ -939,12 +948,12 @@ Betting Status and Timer Styling */
         gap: 12px;
         padding: 12px 16px;
     }
-    
+
     .betting-timer-container {
         width: 100%;
         justify-content: center;
     }
-    
+
     .betting-timer {
         font-size: 16px;
     }
@@ -954,11 +963,11 @@ Betting Status and Timer Styling */
     .betting-status-bar {
         padding: 10px 12px;
     }
-    
+
     .timer-label {
         font-size: 11px;
     }
-    
+
     .betting-timer {
         font-size: 14px;
         padding: 3px 8px;
@@ -994,8 +1003,18 @@ Betting Status and Timer Styling */
         transform: translateX(100%);
         opacity: 0;
     }
+
     to {
         transform: translateX(0);
         opacity: 1;
     }
+}
+
+/* --- NEW: Timestamp Style --- */
+.bet-timestamp {
+    color: #6b7280; /* Muted gray */
+    font-size: 11px;
+    font-weight: 500;
+    margin-top: 4px;
+    font-style: italic;
 }
