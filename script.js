@@ -854,6 +854,10 @@ function updateBall(deltaTime = 1) {
     ball.vx *= frictionRate;
     ball.vy *= frictionRate;
 
+    // --- START MODIFICATION: Add ball rotation ---
+    ball.rotation += 0.1 * ball.vx; // Spin the ball based on its horizontal velocity
+    // --- END MODIFICATION ---
+
     // Ensure ball maintains minimum movement
     const currentSpeed = Math.sqrt(ball.vx * ball.vx + ball.vy * ball.vy);
     const minSpeed = 0.5; // Minimum speed to keep ball moving
@@ -2670,4 +2674,5 @@ function syncOverlayWithGameState() {
         updateOverlayBettingStatus('closed');
     }
 }
+
 
