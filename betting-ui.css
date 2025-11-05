@@ -775,6 +775,25 @@ nhanced Betslip Styling */
     color: #dc2626;
 }
 
+.bet-status.void {
+    background: #e0f2fe;
+    color: #0369a1;
+}
+
+.bet-return {
+    color: #1f2937;
+    font-size: 12px;
+    font-weight: 600;
+    margin-top: 4px;
+}
+
+.bet-match-result {
+    margin-top: 6px;
+    color: #111827;
+    font-size: 12px;
+    font-weight: 600;
+}
+
 .no-bets {
     text-align: center;
     color: #6b7280;
