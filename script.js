@@ -1718,6 +1718,41 @@ function calculateOdds(probability, margin = 0.05) {
     return Math.max(1.01, 1 / adjustedProb);
 }
 
+function calculateCombinedOverProbability(homeDistribution, awayDistribution, line) {
+    const homeKeys = Object.keys(homeDistribution || {});
+    const awayKeys = Object.keys(awayDistribution || {});
+
+    if (!homeKeys.length || !awayKeys.length) {
+        return 0;
+    }
+
+    const homeTotal = homeKeys.reduce((sum, key) => sum + (homeDistribution[key] || 0), 0);
+    const awayTotal = awayKeys.reduce((sum, key) => sum + (awayDistribution[key] || 0), 0);
+
+    if (!homeTotal || !awayTotal) {
+        return 0;
+    }
+
+    let probability = 0;
+    for (const hKey of homeKeys) {
+        const homeGoals = Number(hKey);
+        const homeProb = (homeDistribution[hKey] || 0) / homeTotal;
+        if (!homeProb) continue;
+
+        for (const aKey of awayKeys) {
+            const awayGoals = Number(aKey);
+            if (homeGoals + awayGoals <= line) continue;
+
+            const awayProb = (awayDistribution[aKey] || 0) / awayTotal;
+            if (!awayProb) continue;
+
+            probability += homeProb * awayProb;
+        }
+    }
+
+    return probability;
+}
+
 // Update betting odds display
 function updateBettingOdds() {
     const stats = historicalStats;
@@ -1732,24 +1767,20 @@ function updateBettingOdds() {
     updateOddElement('drawOdd', 'button[data-outcome="draw"]', drawProb);
     updateOddElement('blueWinOdd', 'button[data-outcome="blue-win"]', awayWinProb);
 
-    // Total Goals Market (Over/Under 2.5)
-    let over25Count = 0;
-    for (let homeGoals = 0; homeGoals <= 6; homeGoals++) {
-        for (let awayGoals = 0; awayGoals <= 6; awayGoals++) {
-            if (homeGoals + awayGoals > 2.5) {
-                const homeProb = (stats.homeGoals[homeGoals] || 0) / total;
-                const awayProb = (stats.awayGoals[awayGoals] || 0) / total;
-                over25Count += homeProb * awayProb * total;
-            }
-        }
-    }
+    // Total Goals Markets (Full Time)
+    const fullTimeGoalLines = [
+        { line: 1.5, key: '1.5', overId: 'over15Odd', underId: 'under15Odd' },
+        { line: 2.5, key: '2.5', overId: 'over25Odd', underId: 'under25Odd' },
+        { line: 3.5, key: '3.5', overId: 'over35Odd', underId: 'under35Odd' }
+    ];
 
-    const over25Prob = over25Count / total;
-    const under25Prob = 1 - over25Prob;
+    fullTimeGoalLines.forEach(cfg => {
+        const overProb = calculateCombinedOverProbability(stats.homeGoals, stats.awayGoals, cfg.line);
+        const underProb = Math.max(0, Math.min(1, 1 - overProb));
 
-    updateOddElement('over25Odd', 'button[data-outcome="over-2.5"]', over25Prob);
-    updateOddElement('under25Odd', 'button[data-outcome="under-2.5"]', under25Prob);
-
+        updateOddElement(cfg.overId, `button[data-market="total-goals"][data-outcome="over-${cfg.key}"]`, overProb);
+        updateOddElement(cfg.underId, `button[data-market="total-goals"][data-outcome="under-${cfg.key}"]`, underProb);
+    });
 
     // Both Teams To Score
     const homeScoreProb = 1 - (stats.homeGoals[0] / total);
@@ -1760,14 +1791,20 @@ function updateBettingOdds() {
     updateOddElement('bttsYesOdd', 'button[data-outcome="yes"]', bttsYesProb);
     updateOddElement('bttsNoOdd', 'button[data-outcome="no"]', bttsNoProb);
 
-    // First Half Goals (Over/Under 0.5)
-    const fhHomeScoreProb = 1 - (stats.firstHalfHome[0] / total);
-    const fhAwayScoreProb = 1 - (stats.firstHalfAway[0] / total);
-    const fhOver05Prob = 1 - ((stats.firstHalfHome[0] / total) * (stats.firstHalfAway[0] / total));
-    const fhUnder05Prob = 1 - fhOver05Prob;
+    // First Half Goals Markets
+    const firstHalfGoalLines = [
+        { line: 0.5, key: '0.5', overId: 'fhOver05Odd', underId: 'fhUnder05Odd' },
+        { line: 1.5, key: '1.5', overId: 'fhOver15Odd', underId: 'fhUnder15Odd' },
+        { line: 2.5, key: '2.5', overId: 'fhOver25Odd', underId: 'fhUnder25Odd' }
+    ];
 
-    updateOddElement('fhOver05Odd', 'button[data-outcome="over-0.5"]', fhOver05Prob);
-    updateOddElement('fhUnder05Odd', 'button[data-outcome="under-0.5"]', fhUnder05Prob);
+    firstHalfGoalLines.forEach(cfg => {
+        const overProb = calculateCombinedOverProbability(stats.firstHalfHome, stats.firstHalfAway, cfg.line);
+        const underProb = Math.max(0, Math.min(1, 1 - overProb));
+
+        updateOddElement(cfg.overId, `button[data-market="fh-goals"][data-outcome="over-${cfg.key}"]`, overProb);
+        updateOddElement(cfg.underId, `button[data-market="fh-goals"][data-outcome="under-${cfg.key}"]`, underProb);
+    });
 
     // --- NEW: Clean Sheet Market (Pre-match) ---
     const redCleanSheetProb = stats.awayGoals[0] / total;
