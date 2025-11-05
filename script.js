@@ -17,8 +17,9 @@ const PLAYER_RADIUS = 13;
 const BALL_RADIUS = 8; 
 const GOAL_WIDTH = 10;
 const GOAL_HEIGHT = 100;
-const MAX_PLAYER_SPEED = 5; 
-const MAX_BALL_SPEED = 10; 
+const MAX_PLAYER_SPEED = 5;
+const GOALKEEPER_SPEED = 2.5;
+const MAX_BALL_SPEED = 10;
 
 // Field dimensions
 const PENALTY_BOX_WIDTH = 80; // 16-yard box width
@@ -453,7 +454,7 @@ function startPlay() {
     // Start players moving
     for (const player of players) {
         if (player.isGoalkeeper) {
-            player.vy = MAX_PLAYER_SPEED * (Math.random() > 0.5 ? 1 : -1);
+            player.vy = GOALKEEPER_SPEED * (Math.random() > 0.5 ? 1 : -1);
             player.vx = 0; // Goalkeepers don't move horizontally
         } else {
             player.vx = (Math.random() - 0.5) * MAX_PLAYER_SPEED;
@@ -600,26 +601,42 @@ function isInRightGoalBox(x, y, radius) {
         y - radius < goalBoxYBottom;
 }
 
-// Push player out of goal box if they're not a goalkeeper
-function enforceGoalBoxRestriction(player) {
-    if (player.isGoalkeeper) return; // Goalkeepers can be in goal boxes
+// Check if a position is inside the left penalty box (16-yard box)
+function isInLeftPenaltyBox(x, y, radius) {
+    return x - radius < PENALTY_BOX_WIDTH &&
+        y + radius > penaltyBoxYTop &&
+        y - radius < penaltyBoxYBottom;
+}
 
-    // --- START MODIFICATION: Stricter 6-yard box rule ---
-    // Check if player is in *either* 6-yard box
+// Check if a position is inside the right penalty box (16-yard box)
+function isInRightPenaltyBox(x, y, radius) {
+    return x + radius > SCREEN_WIDTH - PENALTY_BOX_WIDTH &&
+        y + radius > penaltyBoxYTop &&
+        y - radius < penaltyBoxYBottom;
+}
 
-    const inLeftBox = isInLeftGoalBox(player.x, player.y, player.radius);
-    const inRightBox = isInRightGoalBox(player.x, player.y, player.radius);
+// Push field players out of restricted goal areas
+function enforceRestrictedGoalAreas(player) {
+    if (player.isGoalkeeper) return; // Goalkeepers can enter restricted zones
 
-    if (inLeftBox) {
-        // Player is in the left box, push them right
+    const inLeftGoalBox = isInLeftGoalBox(player.x, player.y, player.radius);
+    const inRightGoalBox = isInRightGoalBox(player.x, player.y, player.radius);
+    const inLeftPenaltyBox = isInLeftPenaltyBox(player.x, player.y, player.radius);
+    const inRightPenaltyBox = isInRightPenaltyBox(player.x, player.y, player.radius);
+
+    if (inLeftGoalBox) {
         player.x = GOAL_BOX_WIDTH + player.radius + 1;
-        player.vx = Math.abs(player.vx) || 0.5; // Force push right
-    } else if (inRightBox) {
-        // Player is in the right box, push them left
+        player.vx = Math.abs(player.vx) || 0.5;
+    } else if (inLeftPenaltyBox) {
+        player.x = PENALTY_BOX_WIDTH + player.radius + 1;
+        player.vx = Math.abs(player.vx) || 0.5;
+    } else if (inRightGoalBox) {
         player.x = SCREEN_WIDTH - GOAL_BOX_WIDTH - player.radius - 1;
-        player.vx = -Math.abs(player.vx) || -0.5; // Force push left
+        player.vx = -Math.abs(player.vx) || -0.5;
+    } else if (inRightPenaltyBox) {
+        player.x = SCREEN_WIDTH - PENALTY_BOX_WIDTH - player.radius - 1;
+        player.vx = -Math.abs(player.vx) || -0.5;
     }
-    // --- END MODIFICATION ---
 }
 
 
@@ -805,10 +822,10 @@ function updatePlayers(deltaTime = 1) {
 
             if (player.y <= minY) {
                 player.y = minY;
-                player.vy = Math.abs(player.vy) || MAX_PLAYER_SPEED; // Ensure movement
+                player.vy = Math.abs(player.vy) || GOALKEEPER_SPEED; // Ensure movement
             } else if (player.y >= maxY) {
                 player.y = maxY;
-                player.vy = -Math.abs(player.vy) || -MAX_PLAYER_SPEED; // Ensure movement
+                player.vy = -Math.abs(player.vy) || -GOALKEEPER_SPEED; // Ensure movement
             }
 
             // Keep goalkeeper in their goal box
@@ -820,7 +837,7 @@ function updatePlayers(deltaTime = 1) {
 
             // Ensure goalkeeper is always moving
             if (Math.abs(player.vy) < 0.5) {
-                player.vy = player.vy >= 0 ? MAX_PLAYER_SPEED : -MAX_PLAYER_SPEED;
+                player.vy = player.vy >= 0 ? GOALKEEPER_SPEED : -GOALKEEPER_SPEED;
             }
         } else {
             // Field player logic
@@ -839,8 +856,8 @@ function updatePlayers(deltaTime = 1) {
             player.x += player.vx * gameSpeed;
             player.y += player.vy * gameSpeed;
 
-            // Enforce goal box restrictions (no field players in 6-yard boxes)
-            enforceGoalBoxRestriction(player);
+            // Enforce restricted areas (no field players in the 6-yard or 16-yard boxes)
+            enforceRestrictedGoalAreas(player);
 
             // Wall collisions (bounce)
             if (player.x < player.radius) {
