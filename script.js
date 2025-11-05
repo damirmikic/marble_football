@@ -17,9 +17,9 @@ const PLAYER_RADIUS = 13;
 const BALL_RADIUS = 8; 
 const GOAL_WIDTH = 10;
 const GOAL_HEIGHT = 100;
-const MAX_PLAYER_SPEED = 5;
+const MAX_PLAYER_SPEED = 8.5;
 const GOALKEEPER_SPEED = 2.5;
-const MAX_BALL_SPEED = 10;
+const MAX_BALL_SPEED = 12;
 
 // Field dimensions
 const PENALTY_BOX_WIDTH = 80; // 16-yard box width
@@ -3170,4 +3170,5 @@ function syncOverlayWithGameState() {
         updateOverlayBettingStatus('closed');
     }
 }
+
 
