@@ -2772,7 +2772,36 @@ function updateLiveOdds() {
     let totalHomeWinProb = 0;
     let totalDrawProb = 0;
     let totalAwayWinProb = 0;
-    let totalOver25Prob = 0;
+    // Track total goal probabilities for multiple lines
+    const totalGoalLines = [
+        {
+            line: 1.5,
+            overId: 'over15Odd',
+            overSelector: 'button[data-outcome="over-1.5"]',
+            underId: 'under15Odd',
+            underSelector: 'button[data-outcome="under-1.5"]'
+        },
+        {
+            line: 2.5,
+            overId: 'over25Odd',
+            overSelector: 'button[data-outcome="over-2.5"]',
+            underId: 'under25Odd',
+            underSelector: 'button[data-outcome="under-2.5"]'
+        },
+        {
+            line: 3.5,
+            overId: 'over35Odd',
+            overSelector: 'button[data-outcome="over-3.5"]',
+            underId: 'under35Odd',
+            underSelector: 'button[data-outcome="under-3.5"]'
+        }
+    ];
+
+    const totalGoalsProbabilities = totalGoalLines.reduce((acc, cfg) => {
+        acc[cfg.line] = 0;
+        return acc;
+    }, {});
+
     let totalBTTS_Yes_Prob = 0;
     let totalProbSum = 0; // For normalization
 
@@ -2810,9 +2839,11 @@ function updateLiveOdds() {
             }
 
             // --- B. Total Goals (Over/Under 2.5) ---
-            if (final_total_goals > 2.5) {
-                totalOver25Prob += prob_this_outcome;
-            }
+            totalGoalLines.forEach(cfg => {
+                if (final_total_goals > cfg.line) {
+                    totalGoalsProbabilities[cfg.line] += prob_this_outcome;
+                }
+            });
 
             // --- C. BTTS (Both Teams to Score) ---
             if (final_home_goals > 0 && final_away_goals > 0) {
@@ -2836,20 +2867,31 @@ function updateLiveOdds() {
     updateOddElement('blueWinOdd', 'button[data-outcome="blue-win"]', finalAwayProb);
 
 
-    // --- Total Goals O/U 2.5 ---
+    // --- Total Goals Markets ---
     const currentTotalGoals = currentHomeGoals + currentAwayGoals;
-    if (currentTotalGoals > 2.5) {
-        // Market is already settled as Over
-        disableMarketButton(document.querySelector('button[data-outcome="over-2.5"]'), "Settled (Over)");
-        disableMarketButton(document.querySelector('button[data-outcome="under-2.5"]'), "Settled (Over)");
-    } else {
-        // Normalize O/U 2.5 probability
-        const finalOver25Prob = totalOver25Prob / totalProbSum;
-        const finalUnder25Prob = 1.0 - finalOver25Prob;
-        
-        updateOddElement('over25Odd', 'button[data-outcome="over-2.5"]', finalOver25Prob);
-        updateOddElement('under25Odd', 'button[data-outcome="under-2.5"]', finalUnder25Prob);
-    }
+    totalGoalLines.forEach(cfg => {
+        const overButton = document.querySelector(cfg.overSelector);
+        const underButton = document.querySelector(cfg.underSelector);
+
+        if (currentTotalGoals > cfg.line) {
+            // Market is already settled as Over
+            disableMarketButton(overButton, "Settled (Over)");
+            disableMarketButton(underButton, "Settled (Over)");
+            return;
+        }
+
+        if (totalProbSum === 0) {
+            disableMarketButton(overButton, "N/A");
+            disableMarketButton(underButton, "N/A");
+            return;
+        }
+
+        const finalOverProb = totalGoalsProbabilities[cfg.line] / totalProbSum;
+        const finalUnderProb = 1.0 - finalOverProb;
+
+        updateOddElement(cfg.overId, cfg.overSelector, finalOverProb);
+        updateOddElement(cfg.underId, cfg.underSelector, finalUnderProb);
+    });
     
     // --- BTTS Market ---
     if (currentHomeGoals > 0 && currentAwayGoals > 0) {
@@ -2956,6 +2998,8 @@ function updateOddElement(elementId, buttonSelector, probability) {
         else if (outcome === 'under-1.5') selectionEl.textContent = 'Under 1.5';
         else if (outcome === 'over-2.5') selectionEl.textContent = 'Over 2.5';
         else if (outcome === 'under-2.5') selectionEl.textContent = 'Under 2.5';
+        else if (outcome === 'over-3.5') selectionEl.textContent = 'Over 3.5';
+        else if (outcome === 'under-3.5') selectionEl.textContent = 'Under 3.5';
     }
 }
 
