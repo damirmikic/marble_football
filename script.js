@@ -1261,7 +1261,9 @@ function finishMatch() {
             firstHalfHomeGoals: currentMatch.firstHalfHomeGoals,
             firstHalfAwayGoals: currentMatch.firstHalfAwayGoals,
             firstHalfGoals: currentMatch.firstHalfHomeGoals + currentMatch.firstHalfAwayGoals, // Combined for fh-goals market
-            btts: (currentMatch.homeGoals > 0 && currentMatch.awayGoals > 0) // Explicitly add btts result
+            btts: (currentMatch.homeGoals > 0 && currentMatch.awayGoals > 0), // Explicitly add btts result
+            homeTeam: currentMatch.homeTeam,
+            awayTeam: currentMatch.awayTeam
         };
         
         // Add a short delay to allow the final score to be seen before settlement UI updates
@@ -2115,6 +2117,21 @@ function hideBetMessage() {
     document.getElementById('betMessage').style.display = 'none';
 }
 
+function formatBetStatus(status) {
+    switch ((status || '').toLowerCase()) {
+        case 'won':
+            return 'Won';
+        case 'lost':
+            return 'Lost';
+        case 'void':
+            return 'Void';
+        case 'pending':
+            return 'Pending';
+        default:
+            return status ? status.charAt(0).toUpperCase() + status.slice(1) : '';
+    }
+}
+
 // Update active bets display
 function updateActiveBets() {
     const betsList = document.getElementById('betsList');
@@ -2133,6 +2150,22 @@ function updateActiveBets() {
             hour12: true
         });
 
+        const statusLabel = formatBetStatus(bet.status);
+        const potentialReturn =
+            bet.status === 'won'
+                ? bet.potentialReturn.toFixed(2)
+                : bet.status === 'pending'
+                    ? bet.potentialReturn.toFixed(2)
+                    : bet.status === 'void'
+                        ? bet.stake.toFixed(2)
+                        : '0.00';
+        const returnLabel =
+            bet.status === 'pending'
+                ? `Potential Return: $${potentialReturn}`
+                : bet.status === 'void'
+                    ? `Stake Returned: $${potentialReturn}`
+                    : `Return: $${potentialReturn}`;
+
         return `
         <div class="bet-item ${bet.status}">
             <div class="bet-details">
@@ -2141,15 +2174,13 @@ function updateActiveBets() {
                 <div class="bet-stake-odds">
                     Stake: $${bet.stake.toFixed(2)} @ ${bet.odds.toFixed(2)}
                 </div>
-                <div class="bet-potential-return">
-                    Return: $${(bet.status === 'won') ? bet.potentialReturn.toFixed(2) : (bet.status === 'pending' ? bet.potentialReturn.toFixed(2) : '0.00')}
-                </div>
+                <div class="bet-return">${returnLabel}</div>
                 <!-- NEW: Timestamp -->
                 <div class="bet-timestamp">
                     Placed: ${timestamp}
                 </div>
             </div>
-            <div class="bet-status">${bet.status}</div>
+            <div class="bet-status ${bet.status}">${statusLabel}</div>
         </div>
     `}).join('');
 }
@@ -2166,14 +2197,29 @@ function updateBetHistory() {
 
     // Show newest bets first (since we use unshift())
     historyList.innerHTML = betHistory.map(bet => {
-        // --- ADDED TIMESTAMP ---
-        const timestamp = new Date(bet.timestamp).toLocaleString('en-US', {
+        const settledDate = bet.settledTimestamp ? new Date(bet.settledTimestamp) : new Date(bet.timestamp);
+        const timestamp = settledDate.toLocaleString('en-US', {
             month: 'short',
             day: 'numeric',
             hour: '2-digit',
             minute: '2-digit',
             hour12: true
         });
+        const statusLabel = formatBetStatus(bet.status);
+        const settledReturn =
+            typeof bet.settledReturn === 'number'
+                ? bet.settledReturn
+                : bet.status === 'won'
+                    ? bet.potentialReturn
+                    : bet.status === 'void'
+                        ? bet.stake
+                        : 0;
+        const returnLabel = bet.status === 'void'
+            ? `Stake Returned: $${settledReturn.toFixed(2)}`
+            : `Return: $${settledReturn.toFixed(2)}`;
+        const matchResultDisplay = bet.matchResultDisplay
+            ? bet.matchResultDisplay
+            : (bet.matchResultSummary ? `${bet.matchResultSummary}${bet.matchWinnerLabel ? ` (${bet.matchWinnerLabel})` : ''}` : 'Match result unavailable');
 
         return `
         <div class="bet-item ${bet.status}">
@@ -2183,15 +2229,14 @@ function updateBetHistory() {
                 <div class="bet-stake-odds">
                     Stake: $${bet.stake.toFixed(2)} @ ${bet.odds.toFixed(2)}
                 </div>
-                <div class="bet-potential-return">
-                    Return: $${(bet.status === 'won') ? bet.potentialReturn.toFixed(2) : '0.00'}
-                </div>
+                <div class="bet-return">${returnLabel}</div>
+                <div class="bet-match-result">Result: ${matchResultDisplay}</div>
                 <!-- NEW: Timestamp -->
                 <div class="bet-timestamp">
                     Settled: ${timestamp}
                 </div>
             </div>
-            <div class="bet-status">${bet.status}</div>
+            <div class="bet-status ${bet.status}">${statusLabel}</div>
         </div>
     `}).join('');
 }
@@ -2258,51 +2303,79 @@ function settleBets(matchResult) {
 
     console.log(`Settling ${betsToSettle.length} bets for match ${currentMatch.matchNumber}...`);
 
-    betsToSettle.forEach(bet => {
-        let won = false;
+    const homeTeam = matchResult.homeTeam || 'Red';
+    const awayTeam = matchResult.awayTeam || 'Blue';
+    const matchSummary = `${homeTeam} ${matchResult.homeGoals}-${matchResult.awayGoals} ${awayTeam}`;
+    const winnerLabel = matchResult.winner === 'draw'
+        ? 'Draw'
+        : `${matchResult.winner === 'red' ? homeTeam : awayTeam} Win`;
 
-        // Check bet outcome based on match result
+    betsToSettle.forEach(bet => {
+        let status = 'lost';
+        let payout = 0;
+
         switch (bet.market) {
             case '1x2':
-                if (bet.outcome === 'red-win' && matchResult.winner === 'red') won = true;
-                if (bet.outcome === 'blue-win' && matchResult.winner === 'blue') won = true;
-                if (bet.outcome === 'draw' && matchResult.winner === 'draw') won = true;
+                if (bet.outcome === 'red-win' && matchResult.winner === 'red') status = 'won';
+                if (bet.outcome === 'blue-win' && matchResult.winner === 'blue') status = 'won';
+                if (bet.outcome === 'draw' && matchResult.winner === 'draw') status = 'won';
                 break;
 
-            case 'total-goals':
+            case 'total-goals': {
                 const totalGoals = matchResult.totalGoals;
                 const line = parseFloat(bet.outcome.split('-')[1]);
-                if (bet.outcome.startsWith('over') && totalGoals > line) won = true;
-                if (bet.outcome.startsWith('under') && totalGoals < line) won = true;
+                if (!Number.isNaN(line) && totalGoals === line) {
+                    status = 'void';
+                } else if (bet.outcome.startsWith('over') && totalGoals > line) {
+                    status = 'won';
+                } else if (bet.outcome.startsWith('under') && totalGoals < line) {
+                    status = 'won';
+                }
                 break;
+            }
 
-            case 'btts':
+            case 'btts': {
                 const btts = matchResult.btts;
-                if (bet.outcome === 'yes' && btts) won = true;
-                if (bet.outcome === 'no' && !btts) won = true;
+                if (bet.outcome === 'yes' && btts) status = 'won';
+                if (bet.outcome === 'no' && !btts) status = 'won';
                 break;
+            }
 
-            case 'fh-goals':
+            case 'fh-goals': {
                 const fhGoals = matchResult.firstHalfGoals;
                 const fhLine = parseFloat(bet.outcome.split('-')[1]);
-                if (bet.outcome.startsWith('over') && fhGoals > fhLine) won = true;
-                if (bet.outcome.startsWith('under') && fhGoals < fhLine) won = true;
+                if (!Number.isNaN(fhLine) && fhGoals === fhLine) {
+                    status = 'void';
+                } else if (bet.outcome.startsWith('over') && fhGoals > fhLine) {
+                    status = 'won';
+                } else if (bet.outcome.startsWith('under') && fhGoals < fhLine) {
+                    status = 'won';
+                }
                 break;
-            
+            }
+
             case 'specials':
-                if (bet.outcome === 'red-clean-sheet' && matchResult.awayGoals === 0) won = true;
-                if (bet.outcome === 'blue-clean-sheet' && matchResult.homeGoals === 0) won = true;
+                if (bet.outcome === 'red-clean-sheet' && matchResult.awayGoals === 0) status = 'won';
+                if (bet.outcome === 'blue-clean-sheet' && matchResult.homeGoals === 0) status = 'won';
                 break;
         }
 
-        if (won) {
-            bet.status = 'won';
-            const winnings = bet.potentialReturn;
-            userBalance += winnings;
-            showBetMessage(`Bet won! +$${winnings.toFixed(2)}`, 'success');
-        } else {
-            bet.status = 'lost';
+        if (status === 'won') {
+            payout = bet.potentialReturn;
+            userBalance += payout;
+            showBetMessage(`Bet won! +$${payout.toFixed(2)}`, 'success');
+        } else if (status === 'void') {
+            payout = bet.stake;
+            userBalance += payout;
+            showBetMessage(`Bet void - stake returned $${payout.toFixed(2)}`, 'info');
         }
+
+        bet.status = status;
+        bet.settledReturn = payout;
+        bet.settledTimestamp = new Date();
+        bet.matchResultSummary = matchSummary;
+        bet.matchWinnerLabel = winnerLabel;
+        bet.matchResultDisplay = `${matchSummary} (${winnerLabel})`;
     });
 
     // --- NEW: Move settled bets to history ---
