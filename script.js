@@ -13,11 +13,12 @@ const goalScore = document.getElementById('goalScore');
 // Game constants
 const SCREEN_WIDTH = 800;
 const SCREEN_HEIGHT = 500;
-const PLAYER_RADIUS = 13; 
-const BALL_RADIUS = 8; 
+const PLAYER_RADIUS = 13;
+const BALL_RADIUS = 8;
 const GOAL_WIDTH = 10;
 const GOAL_HEIGHT = 100;
 const GOAL_DEPTH = 16;
+const CANVAS_WIDTH = SCREEN_WIDTH + GOAL_DEPTH * 2;
 const MAX_PLAYER_SPEED = 8.5;
 const GOALKEEPER_SPEED = 2.5;
 const MAX_BALL_SPEED = 12.5;
@@ -146,10 +147,13 @@ const formations = {
 
 // Create Pixi Application
 const app = new PIXI.Application({
-    width: SCREEN_WIDTH,
+    width: CANVAS_WIDTH,
     height: SCREEN_HEIGHT,
     backgroundColor: 0x008000 // Field green
 });
+
+// Offset the stage so goal structures drawn behind the lines remain visible
+app.stage.x = GOAL_DEPTH;
 
 // Append canvas to the game container instead of body
 function initGameCanvas() {
