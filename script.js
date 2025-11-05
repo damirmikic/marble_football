@@ -17,8 +17,9 @@ const PLAYER_RADIUS = 13;
 const BALL_RADIUS = 8; 
 const GOAL_WIDTH = 10;
 const GOAL_HEIGHT = 100;
-const MAX_PLAYER_SPEED = 5; 
-const MAX_BALL_SPEED = 10; 
+const MAX_PLAYER_SPEED = 5;
+const GOALKEEPER_SPEED = 2.5;
+const MAX_BALL_SPEED = 10;
 
 // Field dimensions
 const PENALTY_BOX_WIDTH = 80; // 16-yard box width
@@ -453,7 +454,7 @@ function startPlay() {
     // Start players moving
     for (const player of players) {
         if (player.isGoalkeeper) {
-            player.vy = MAX_PLAYER_SPEED * (Math.random() > 0.5 ? 1 : -1);
+            player.vy = GOALKEEPER_SPEED * (Math.random() > 0.5 ? 1 : -1);
             player.vx = 0; // Goalkeepers don't move horizontally
         } else {
             player.vx = (Math.random() - 0.5) * MAX_PLAYER_SPEED;
@@ -600,26 +601,42 @@ function isInRightGoalBox(x, y, radius) {
         y - radius < goalBoxYBottom;
 }
 
-// Push player out of goal box if they're not a goalkeeper
-function enforceGoalBoxRestriction(player) {
-    if (player.isGoalkeeper) return; // Goalkeepers can be in goal boxes
+// Check if a position is inside the left penalty box (16-yard box)
+function isInLeftPenaltyBox(x, y, radius) {
+    return x - radius < PENALTY_BOX_WIDTH &&
+        y + radius > penaltyBoxYTop &&
+        y - radius < penaltyBoxYBottom;
+}
 
-    // --- START MODIFICATION: Stricter 6-yard box rule ---
-    // Check if player is in *either* 6-yard box
+// Check if a position is inside the right penalty box (16-yard box)
+function isInRightPenaltyBox(x, y, radius) {
+    return x + radius > SCREEN_WIDTH - PENALTY_BOX_WIDTH &&
+        y + radius > penaltyBoxYTop &&
+        y - radius < penaltyBoxYBottom;
+}
 
-    const inLeftBox = isInLeftGoalBox(player.x, player.y, player.radius);
-    const inRightBox = isInRightGoalBox(player.x, player.y, player.radius);
+// Push field players out of restricted goal areas
+function enforceRestrictedGoalAreas(player) {
+    if (player.isGoalkeeper) return; // Goalkeepers can enter restricted zones
 
-    if (inLeftBox) {
-        // Player is in the left box, push them right
+    const inLeftGoalBox = isInLeftGoalBox(player.x, player.y, player.radius);
+    const inRightGoalBox = isInRightGoalBox(player.x, player.y, player.radius);
+    const inLeftPenaltyBox = isInLeftPenaltyBox(player.x, player.y, player.radius);
+    const inRightPenaltyBox = isInRightPenaltyBox(player.x, player.y, player.radius);
+
+    if (inLeftGoalBox) {
         player.x = GOAL_BOX_WIDTH + player.radius + 1;
-        player.vx = Math.abs(player.vx) || 0.5; // Force push right
-    } else if (inRightBox) {
-        // Player is in the right box, push them left
+        player.vx = Math.abs(player.vx) || 0.5;
+    } else if (inLeftPenaltyBox) {
+        player.x = PENALTY_BOX_WIDTH + player.radius + 1;
+        player.vx = Math.abs(player.vx) || 0.5;
+    } else if (inRightGoalBox) {
         player.x = SCREEN_WIDTH - GOAL_BOX_WIDTH - player.radius - 1;
-        player.vx = -Math.abs(player.vx) || -0.5; // Force push left
+        player.vx = -Math.abs(player.vx) || -0.5;
+    } else if (inRightPenaltyBox) {
+        player.x = SCREEN_WIDTH - PENALTY_BOX_WIDTH - player.radius - 1;
+        player.vx = -Math.abs(player.vx) || -0.5;
     }
-    // --- END MODIFICATION ---
 }
 
 
@@ -805,10 +822,10 @@ function updatePlayers(deltaTime = 1) {
 
             if (player.y <= minY) {
                 player.y = minY;
-                player.vy = Math.abs(player.vy) || MAX_PLAYER_SPEED; // Ensure movement
+                player.vy = Math.abs(player.vy) || GOALKEEPER_SPEED; // Ensure movement
             } else if (player.y >= maxY) {
                 player.y = maxY;
-                player.vy = -Math.abs(player.vy) || -MAX_PLAYER_SPEED; // Ensure movement
+                player.vy = -Math.abs(player.vy) || -GOALKEEPER_SPEED; // Ensure movement
             }
 
             // Keep goalkeeper in their goal box
@@ -820,7 +837,7 @@ function updatePlayers(deltaTime = 1) {
 
             // Ensure goalkeeper is always moving
             if (Math.abs(player.vy) < 0.5) {
-                player.vy = player.vy >= 0 ? MAX_PLAYER_SPEED : -MAX_PLAYER_SPEED;
+                player.vy = player.vy >= 0 ? GOALKEEPER_SPEED : -GOALKEEPER_SPEED;
             }
         } else {
             // Field player logic
@@ -839,8 +856,8 @@ function updatePlayers(deltaTime = 1) {
             player.x += player.vx * gameSpeed;
             player.y += player.vy * gameSpeed;
 
-            // Enforce goal box restrictions (no field players in 6-yard boxes)
-            enforceGoalBoxRestriction(player);
+            // Enforce restricted areas (no field players in the 6-yard or 16-yard boxes)
+            enforceRestrictedGoalAreas(player);
 
             // Wall collisions (bounce)
             if (player.x < player.radius) {
@@ -1718,6 +1735,41 @@ function calculateOdds(probability, margin = 0.05) {
     return Math.max(1.01, 1 / adjustedProb);
 }
 
+function calculateCombinedOverProbability(homeDistribution, awayDistribution, line) {
+    const homeKeys = Object.keys(homeDistribution || {});
+    const awayKeys = Object.keys(awayDistribution || {});
+
+    if (!homeKeys.length || !awayKeys.length) {
+        return 0;
+    }
+
+    const homeTotal = homeKeys.reduce((sum, key) => sum + (homeDistribution[key] || 0), 0);
+    const awayTotal = awayKeys.reduce((sum, key) => sum + (awayDistribution[key] || 0), 0);
+
+    if (!homeTotal || !awayTotal) {
+        return 0;
+    }
+
+    let probability = 0;
+    for (const hKey of homeKeys) {
+        const homeGoals = Number(hKey);
+        const homeProb = (homeDistribution[hKey] || 0) / homeTotal;
+        if (!homeProb) continue;
+
+        for (const aKey of awayKeys) {
+            const awayGoals = Number(aKey);
+            if (homeGoals + awayGoals <= line) continue;
+
+            const awayProb = (awayDistribution[aKey] || 0) / awayTotal;
+            if (!awayProb) continue;
+
+            probability += homeProb * awayProb;
+        }
+    }
+
+    return probability;
+}
+
 // Update betting odds display
 function updateBettingOdds() {
     const stats = historicalStats;
@@ -1732,24 +1784,20 @@ function updateBettingOdds() {
     updateOddElement('drawOdd', 'button[data-outcome="draw"]', drawProb);
     updateOddElement('blueWinOdd', 'button[data-outcome="blue-win"]', awayWinProb);
 
-    // Total Goals Market (Over/Under 2.5)
-    let over25Count = 0;
-    for (let homeGoals = 0; homeGoals <= 6; homeGoals++) {
-        for (let awayGoals = 0; awayGoals <= 6; awayGoals++) {
-            if (homeGoals + awayGoals > 2.5) {
-                const homeProb = (stats.homeGoals[homeGoals] || 0) / total;
-                const awayProb = (stats.awayGoals[awayGoals] || 0) / total;
-                over25Count += homeProb * awayProb * total;
-            }
-        }
-    }
+    // Total Goals Markets (Full Time)
+    const fullTimeGoalLines = [
+        { line: 1.5, key: '1.5', overId: 'over15Odd', underId: 'under15Odd' },
+        { line: 2.5, key: '2.5', overId: 'over25Odd', underId: 'under25Odd' },
+        { line: 3.5, key: '3.5', overId: 'over35Odd', underId: 'under35Odd' }
+    ];
 
-    const over25Prob = over25Count / total;
-    const under25Prob = 1 - over25Prob;
+    fullTimeGoalLines.forEach(cfg => {
+        const overProb = calculateCombinedOverProbability(stats.homeGoals, stats.awayGoals, cfg.line);
+        const underProb = Math.max(0, Math.min(1, 1 - overProb));
 
-    updateOddElement('over25Odd', 'button[data-outcome="over-2.5"]', over25Prob);
-    updateOddElement('under25Odd', 'button[data-outcome="under-2.5"]', under25Prob);
-
+        updateOddElement(cfg.overId, `button[data-market="total-goals"][data-outcome="over-${cfg.key}"]`, overProb);
+        updateOddElement(cfg.underId, `button[data-market="total-goals"][data-outcome="under-${cfg.key}"]`, underProb);
+    });
 
     // Both Teams To Score
     const homeScoreProb = 1 - (stats.homeGoals[0] / total);
@@ -1760,14 +1808,20 @@ function updateBettingOdds() {
     updateOddElement('bttsYesOdd', 'button[data-outcome="yes"]', bttsYesProb);
     updateOddElement('bttsNoOdd', 'button[data-outcome="no"]', bttsNoProb);
 
-    // First Half Goals (Over/Under 0.5)
-    const fhHomeScoreProb = 1 - (stats.firstHalfHome[0] / total);
-    const fhAwayScoreProb = 1 - (stats.firstHalfAway[0] / total);
-    const fhOver05Prob = 1 - ((stats.firstHalfHome[0] / total) * (stats.firstHalfAway[0] / total));
-    const fhUnder05Prob = 1 - fhOver05Prob;
+    // First Half Goals Markets
+    const firstHalfGoalLines = [
+        { line: 0.5, key: '0.5', overId: 'fhOver05Odd', underId: 'fhUnder05Odd' },
+        { line: 1.5, key: '1.5', overId: 'fhOver15Odd', underId: 'fhUnder15Odd' },
+        { line: 2.5, key: '2.5', overId: 'fhOver25Odd', underId: 'fhUnder25Odd' }
+    ];
 
-    updateOddElement('fhOver05Odd', 'button[data-outcome="over-0.5"]', fhOver05Prob);
-    updateOddElement('fhUnder05Odd', 'button[data-outcome="under-0.5"]', fhUnder05Prob);
+    firstHalfGoalLines.forEach(cfg => {
+        const overProb = calculateCombinedOverProbability(stats.firstHalfHome, stats.firstHalfAway, cfg.line);
+        const underProb = Math.max(0, Math.min(1, 1 - overProb));
+
+        updateOddElement(cfg.overId, `button[data-market="fh-goals"][data-outcome="over-${cfg.key}"]`, overProb);
+        updateOddElement(cfg.underId, `button[data-market="fh-goals"][data-outcome="under-${cfg.key}"]`, underProb);
+    });
 
     // --- NEW: Clean Sheet Market (Pre-match) ---
     const redCleanSheetProb = stats.awayGoals[0] / total;
@@ -2772,7 +2826,36 @@ function updateLiveOdds() {
     let totalHomeWinProb = 0;
     let totalDrawProb = 0;
     let totalAwayWinProb = 0;
-    let totalOver25Prob = 0;
+    // Track total goal probabilities for multiple lines
+    const totalGoalLines = [
+        {
+            line: 1.5,
+            overId: 'over15Odd',
+            overSelector: 'button[data-outcome="over-1.5"]',
+            underId: 'under15Odd',
+            underSelector: 'button[data-outcome="under-1.5"]'
+        },
+        {
+            line: 2.5,
+            overId: 'over25Odd',
+            overSelector: 'button[data-outcome="over-2.5"]',
+            underId: 'under25Odd',
+            underSelector: 'button[data-outcome="under-2.5"]'
+        },
+        {
+            line: 3.5,
+            overId: 'over35Odd',
+            overSelector: 'button[data-outcome="over-3.5"]',
+            underId: 'under35Odd',
+            underSelector: 'button[data-outcome="under-3.5"]'
+        }
+    ];
+
+    const totalGoalsProbabilities = totalGoalLines.reduce((acc, cfg) => {
+        acc[cfg.line] = 0;
+        return acc;
+    }, {});
+
     let totalBTTS_Yes_Prob = 0;
     let totalProbSum = 0; // For normalization
 
@@ -2810,9 +2893,11 @@ function updateLiveOdds() {
             }
 
             // --- B. Total Goals (Over/Under 2.5) ---
-            if (final_total_goals > 2.5) {
-                totalOver25Prob += prob_this_outcome;
-            }
+            totalGoalLines.forEach(cfg => {
+                if (final_total_goals > cfg.line) {
+                    totalGoalsProbabilities[cfg.line] += prob_this_outcome;
+                }
+            });
 
             // --- C. BTTS (Both Teams to Score) ---
             if (final_home_goals > 0 && final_away_goals > 0) {
@@ -2836,20 +2921,31 @@ function updateLiveOdds() {
     updateOddElement('blueWinOdd', 'button[data-outcome="blue-win"]', finalAwayProb);
 
 
-    // --- Total Goals O/U 2.5 ---
+    // --- Total Goals Markets ---
     const currentTotalGoals = currentHomeGoals + currentAwayGoals;
-    if (currentTotalGoals > 2.5) {
-        // Market is already settled as Over
-        disableMarketButton(document.querySelector('button[data-outcome="over-2.5"]'), "Settled (Over)");
-        disableMarketButton(document.querySelector('button[data-outcome="under-2.5"]'), "Settled (Over)");
-    } else {
-        // Normalize O/U 2.5 probability
-        const finalOver25Prob = totalOver25Prob / totalProbSum;
-        const finalUnder25Prob = 1.0 - finalOver25Prob;
-        
-        updateOddElement('over25Odd', 'button[data-outcome="over-2.5"]', finalOver25Prob);
-        updateOddElement('under25Odd', 'button[data-outcome="under-2.5"]', finalUnder25Prob);
-    }
+    totalGoalLines.forEach(cfg => {
+        const overButton = document.querySelector(cfg.overSelector);
+        const underButton = document.querySelector(cfg.underSelector);
+
+        if (currentTotalGoals > cfg.line) {
+            // Market is already settled as Over
+            disableMarketButton(overButton, "Settled (Over)");
+            disableMarketButton(underButton, "Settled (Over)");
+            return;
+        }
+
+        if (totalProbSum === 0) {
+            disableMarketButton(overButton, "N/A");
+            disableMarketButton(underButton, "N/A");
+            return;
+        }
+
+        const finalOverProb = totalGoalsProbabilities[cfg.line] / totalProbSum;
+        const finalUnderProb = 1.0 - finalOverProb;
+
+        updateOddElement(cfg.overId, cfg.overSelector, finalOverProb);
+        updateOddElement(cfg.underId, cfg.underSelector, finalUnderProb);
+    });
     
     // --- BTTS Market ---
     if (currentHomeGoals > 0 && currentAwayGoals > 0) {
@@ -2956,6 +3052,8 @@ function updateOddElement(elementId, buttonSelector, probability) {
         else if (outcome === 'under-1.5') selectionEl.textContent = 'Under 1.5';
         else if (outcome === 'over-2.5') selectionEl.textContent = 'Over 2.5';
         else if (outcome === 'under-2.5') selectionEl.textContent = 'Under 2.5';
+        else if (outcome === 'over-3.5') selectionEl.textContent = 'Over 3.5';
+        else if (outcome === 'under-3.5') selectionEl.textContent = 'Under 3.5';
     }
 }
 
