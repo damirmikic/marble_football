@@ -17,9 +17,10 @@ const PLAYER_RADIUS = 13;
 const BALL_RADIUS = 8; 
 const GOAL_WIDTH = 10;
 const GOAL_HEIGHT = 100;
-const MAX_PLAYER_SPEED = 9.5;
+const GOAL_DEPTH = 16;
+const MAX_PLAYER_SPEED = 8.5;
 const GOALKEEPER_SPEED = 2.5;
-const MAX_BALL_SPEED = 13;
+const MAX_BALL_SPEED = 12.5;
 
 // Field dimensions
 const PENALTY_BOX_WIDTH = 80; // 16-yard box width
@@ -219,48 +220,44 @@ function createField() {
     graphics.lineStyle(4, 0xFFFFFF); // Goal posts
 
     // Left goal (Red team defends, Blue attacks)
-    // Goal posts and crossbar
-    graphics.moveTo(0, goalYTop - 3);
-    graphics.lineTo(12, goalYTop - 3); // Top crossbar
-    graphics.lineTo(12, goalYTop); // Right post top
-    graphics.lineTo(12, goalYBottom); // Right post
-    graphics.lineTo(12, goalYBottom + 3); // Right post bottom
-    graphics.lineTo(0, goalYBottom + 3); // Bottom crossbar
-    graphics.lineTo(0, goalYBottom); // Left post bottom
-    graphics.lineTo(0, goalYTop); // Left post (goal line)
+    // Goal posts and crossbar positioned behind the goal line
+    graphics.moveTo(0, goalYTop);
+    graphics.lineTo(-GOAL_DEPTH, goalYTop); // Top crossbar (behind line)
+    graphics.lineTo(-GOAL_DEPTH, goalYBottom); // Back post
+    graphics.lineTo(0, goalYBottom); // Return to goal line
 
     // Goal net pattern
     graphics.lineStyle(1, 0xDDDDDD);
     for (let i = 1; i < 4; i++) {
-        graphics.moveTo(1, goalYTop + (GOAL_HEIGHT * i / 4));
-        graphics.lineTo(11, goalYTop + (GOAL_HEIGHT * i / 4));
+        const netY = goalYTop + (GOAL_HEIGHT * i / 4);
+        graphics.moveTo(-GOAL_DEPTH + 1, netY);
+        graphics.lineTo(-1, netY);
     }
     for (let i = 1; i < 4; i++) {
-        graphics.moveTo(1 + i * 3, goalYTop);
-        graphics.lineTo(1 + i * 3, goalYBottom);
+        const netX = -GOAL_DEPTH + i * (GOAL_DEPTH / 4);
+        graphics.moveTo(netX, goalYTop + 1);
+        graphics.lineTo(netX, goalYBottom - 1);
     }
 
-    // Right goal (Blue team defends, Red attacks)  
+    // Right goal (Blue team defends, Red attacks)
     graphics.lineStyle(4, 0xFFFFFF); // Goal posts
-    // Goal posts and crossbar
-    graphics.moveTo(SCREEN_WIDTH, goalYTop - 3);
-    graphics.lineTo(SCREEN_WIDTH - 12, goalYTop - 3); // Top crossbar
-    graphics.lineTo(SCREEN_WIDTH - 12, goalYTop); // Left post top
-    graphics.lineTo(SCREEN_WIDTH - 12, goalYBottom); // Left post
-    graphics.lineTo(SCREEN_WIDTH - 12, goalYBottom + 3); // Left post bottom
-    graphics.lineTo(SCREEN_WIDTH, goalYBottom + 3); // Bottom crossbar
-    graphics.lineTo(SCREEN_WIDTH, goalYBottom); // Right post bottom
-    graphics.lineTo(SCREEN_WIDTH, goalYTop); // Right post (goal line)
+    // Goal posts and crossbar positioned behind the goal line
+    graphics.moveTo(SCREEN_WIDTH, goalYTop);
+    graphics.lineTo(SCREEN_WIDTH + GOAL_DEPTH, goalYTop); // Top crossbar (behind line)
+    graphics.lineTo(SCREEN_WIDTH + GOAL_DEPTH, goalYBottom); // Back post
+    graphics.lineTo(SCREEN_WIDTH, goalYBottom); // Return to goal line
 
     // Goal net pattern
     graphics.lineStyle(1, 0xDDDDDD);
     for (let i = 1; i < 4; i++) {
-        graphics.moveTo(SCREEN_WIDTH - 11, goalYTop + (GOAL_HEIGHT * i / 4));
-        graphics.lineTo(SCREEN_WIDTH - 1, goalYTop + (GOAL_HEIGHT * i / 4));
+        const netY = goalYTop + (GOAL_HEIGHT * i / 4);
+        graphics.moveTo(SCREEN_WIDTH + 1, netY);
+        graphics.lineTo(SCREEN_WIDTH + GOAL_DEPTH - 1, netY);
     }
     for (let i = 1; i < 4; i++) {
-        graphics.moveTo(SCREEN_WIDTH - 11 + i * 3, goalYTop);
-        graphics.lineTo(SCREEN_WIDTH - 11 + i * 3, goalYBottom);
+        const netX = SCREEN_WIDTH + i * (GOAL_DEPTH / 4);
+        graphics.moveTo(netX, goalYTop + 1);
+        graphics.lineTo(netX, goalYBottom - 1);
     }
 
     app.stage.addChild(graphics);
