@@ -81,6 +81,7 @@ test('both teams line up mirrored: defenders nearest their own goal', async () =
 
 test('batch mode plays a series without betting windows and records CSV data', async () => {
     const page = await openGame(browser, { freeze: false });
+    await page.click('#simPanel summary');
     await page.fill('#matchCount', '2');
     await page.fill('#gameSpeed', '50');
     await page.evaluate(() => updateGameSpeed());
@@ -94,5 +95,21 @@ test('batch mode plays a series without betting windows and records CSV data', a
     }));
     assert.deepEqual(r, { rows: 3, consistent: true, windowOpen: false });
     assert.deepEqual(page.errors, []);
+    await page.close();
+});
+
+test('speed buttons and the sound toggle', async () => {
+    const page = await openGame(browser);
+    await page.click('.speed-btn[data-speed="5"]');
+    assert.deepEqual(await page.evaluate(() => [gameSpeed, document.querySelector('.speed-btn.active').dataset.speed]), [5, '5']);
+
+    assert.equal(await page.getAttribute('#soundToggle', 'aria-pressed'), 'true');
+    await page.click('#soundToggle');
+    assert.equal(await page.getAttribute('#soundToggle', 'aria-pressed'), 'false');
+    await page.reload();
+    await page.waitForFunction(() => document.getElementById('soundToggle').textContent.length > 0);
+    assert.equal(await page.getAttribute('#soundToggle', 'aria-pressed'), 'false', 'mute is remembered');
+    assert.deepEqual(page.errors, []);
+    await page.evaluate(() => localStorage.clear());
     await page.close();
 });

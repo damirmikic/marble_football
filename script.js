@@ -607,6 +607,7 @@ function startPlay() {
 
     gameRunning = true;
     gameStarted = true;
+    Sound.whistle(1);
 
     // Immediately sync overlay to show markets as suspended
     syncOverlayWithGameState();
@@ -806,6 +807,7 @@ function updateTimer(dt) {
     } else if (gameHalf === 1 && timer >= halftimeSeconds + injuryTime.first) {
         gameRunning = false; // Stop the game
         showGameMessage("HALF TIME!", 3000);
+        Sound.whistle(2);
 
         if (autoMode) {
             // No betting in batch simulation - go straight to the second half
@@ -826,6 +828,7 @@ function updateTimer(dt) {
         // Game Over
         gameRunning = false;
         gameStarted = false;
+        Sound.whistle(3);
         finishMatch(); // Records the result and settles bets
 
         if (autoMode && currentMatchNumber < totalMatches) {
@@ -931,6 +934,7 @@ function resolveBallPlayerCollision(ball, player) {
         ball.vx = (ball.vx / speed) * MAX_BALL_SPEED;
         ball.vy = (ball.vy / speed) * MAX_BALL_SPEED;
     }
+    Sound.kick(Math.min(speed, MAX_BALL_SPEED));
 }
 
 /* --- 4. GAME LOOP (UPDATE) FUNCTIONS --- */
@@ -1094,6 +1098,7 @@ function handleGoal(team) {
     updateScore();
     gameRunning = false;
     flashGoal(team);
+    Sound.goal();
 
     const restart = () => {
         resetToCenter();
@@ -1489,6 +1494,9 @@ function updateGameSpeed() {
     gameSpeed = Math.max(0.1, Math.min(50, speed)); // Clamp between 0.1 and 50
 
     if (speedDisplay) speedDisplay.textContent = `Speed: ${gameSpeed.toFixed(1)}x`;
+    document.querySelectorAll('.speed-btn').forEach(btn => {
+        btn.classList.toggle('active', Number(btn.dataset.speed) === gameSpeed);
+    });
 }
 
 function initSpeedControl() {
@@ -1499,6 +1507,13 @@ function initSpeedControl() {
     updateGameSpeed();
     speedInput.addEventListener('input', updateGameSpeed);
     speedInput.addEventListener('change', updateGameSpeed);
+
+    document.querySelectorAll('.speed-btn').forEach(btn => {
+        btn.addEventListener('click', () => {
+            speedInput.value = btn.dataset.speed;
+            updateGameSpeed();
+        });
+    });
 
     if (testButton) {
         testButton.addEventListener('click', () => {
@@ -2670,11 +2685,128 @@ function syncOverlayWithGameState() {
 }
 
 
+/* --- SOUND --- */
+
+// Synthesised with Web Audio, so there are no sound files to load. The audio context is
+// only created after the first click/keypress (browsers block audio before that).
+const Sound = (() => {
+    const STORAGE = 'marbleFootball.sound';
+    let ctx = null;
+    let enabled = true;
+    let lastKick = 0;
+    try { enabled = localStorage.getItem(STORAGE) !== 'off'; } catch (e) { /* default on */ }
+
+    // Only in normal play: no sound in batch mode or when fast-forwarding hard
+    const audible = () => enabled && ctx && ctx.state === 'running' && !autoMode && !simulationMode && gameSpeed <= 3;
+
+    function unlock() {
+        if (!ctx) {
+            const AudioCtx = window.AudioContext || window.webkitAudioContext;
+            if (!AudioCtx) return;
+            ctx = new AudioCtx();
+        }
+        if (ctx.state === 'suspended') ctx.resume();
+    }
+
+    function envelope(gainNode, start, attack, hold, release, peak) {
+        const g = gainNode.gain;
+        g.setValueAtTime(0.0001, start);
+        g.exponentialRampToValueAtTime(peak, start + attack);
+        g.setValueAtTime(peak, start + attack + hold);
+        g.exponentialRampToValueAtTime(0.0001, start + attack + hold + release);
+    }
+
+    function kick(ballSpeed) {
+        if (!audible()) return;
+        const now = ctx.currentTime;
+        if (now - lastKick < 0.07) return; // avoid a buzz when several players touch at once
+        lastKick = now;
+        const osc = ctx.createOscillator();
+        const gain = ctx.createGain();
+        osc.type = 'triangle';
+        osc.frequency.setValueAtTime(170 + ballSpeed * 6, now);
+        osc.frequency.exponentialRampToValueAtTime(70, now + 0.08);
+        envelope(gain, now, 0.004, 0.01, 0.08, Math.min(0.25, 0.06 + ballSpeed * 0.015));
+        osc.connect(gain).connect(ctx.destination);
+        osc.start(now);
+        osc.stop(now + 0.12);
+    }
+
+    function whistle(blasts = 1) {
+        if (!audible()) return;
+        for (let i = 0; i < blasts; i++) {
+            const start = ctx.currentTime + i * 0.38;
+            const length = i === blasts - 1 && blasts > 1 ? 0.55 : 0.28;
+            const osc = ctx.createOscillator();
+            const trill = ctx.createOscillator(); // the pea in the whistle
+            const trillDepth = ctx.createGain();
+            const gain = ctx.createGain();
+            osc.type = 'sine';
+            osc.frequency.value = 2650;
+            trill.frequency.value = 28;
+            trillDepth.gain.value = 140;
+            trill.connect(trillDepth).connect(osc.frequency);
+            envelope(gain, start, 0.02, length, 0.06, 0.08);
+            osc.connect(gain).connect(ctx.destination);
+            osc.start(start); trill.start(start);
+            osc.stop(start + length + 0.1); trill.stop(start + length + 0.1);
+        }
+    }
+
+    function crowd(duration = 2.6) {
+        if (!audible()) return;
+        const now = ctx.currentTime;
+        const buffer = ctx.createBuffer(1, Math.floor(ctx.sampleRate * duration), ctx.sampleRate);
+        const data = buffer.getChannelData(0);
+        for (let i = 0; i < data.length; i++) data[i] = Math.random() * 2 - 1;
+        const noise = ctx.createBufferSource();
+        noise.buffer = buffer;
+        const band = ctx.createBiquadFilter();
+        band.type = 'bandpass';
+        band.frequency.value = 700;
+        band.Q.value = 0.6;
+        const gain = ctx.createGain();
+        envelope(gain, now, 0.25, 0.6, duration - 0.9, 0.35);
+        noise.connect(band).connect(gain).connect(ctx.destination);
+        noise.start(now);
+    }
+
+    function render(button) {
+        button.textContent = enabled ? '🔊' : '🔇';
+        button.setAttribute('aria-pressed', String(enabled));
+        button.title = enabled ? 'Sound on (click to mute)' : 'Sound off (click to unmute)';
+    }
+
+    function init() {
+        // The first user gesture anywhere unlocks audio
+        const unlockOnce = () => {
+            unlock();
+            window.removeEventListener('pointerdown', unlockOnce);
+            window.removeEventListener('keydown', unlockOnce);
+        };
+        window.addEventListener('pointerdown', unlockOnce);
+        window.addEventListener('keydown', unlockOnce);
+
+        const button = document.getElementById('soundToggle');
+        if (!button) return;
+        render(button);
+        button.addEventListener('click', () => {
+            enabled = !enabled;
+            try { localStorage.setItem(STORAGE, enabled ? 'on' : 'off'); } catch (e) { /* not saved */ }
+            render(button);
+            if (enabled) { unlock(); whistle(1); }
+        });
+    }
+
+    return { init, kick, whistle, goal: () => { crowd(); whistle(1); } };
+})();
+
 /* --- BOOT --- */
 
 // Runs after the whole script has been evaluated, so every top-level binding exists.
 function boot() {
     startGameWhenReady();
+    Sound.init();
     try {
         initializeBetting();
         startBettingTimer(20, 'prematch'); // Initial pre-match betting window
