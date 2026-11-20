@@ -4,16 +4,16 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Pixi.js Soccer</title>
+    <title>Marble Football</title>
     <link rel="stylesheet" href="style.css">
     <link rel="stylesheet" href="betting-ui.css">
     <script src="https://cdnjs.cloudflare.com/ajax/libs/pixi.js/7.4.0/pixi.min.js"></script>
 </head>
 
 <body>
-    <h1>Pixi Soccer</h1>
+    <h1>Marble Football</h1>
     <div class="ui-container">
-        <div id="timer">Half: 1 - 45:00</div>
+        <div id="timer">Half: 1 - 00'</div>
         <div id="score">Red: 0 - Blue: 0</div>
         <div id="speedDisplay">Speed: 1.0x</div>
     </div>
@@ -34,7 +34,7 @@
                 <div class="game-overlay">
                     <div class="game-status-bar">
                         <div class="match-info">
-                            <div class="match-timer" id="gameTimer">Half: 1 - 00:00</div>
+                            <div class="match-timer" id="gameTimer">Half: 1 - 00'</div>
                             <div class="match-score" id="gameScore">Red: 0 - Blue: 0</div>
                         </div>
                         <div class="betting-status-info">
@@ -59,6 +59,10 @@
                     <h2>💰 Your Balance</h2>
                     <div class="balance-display">
                         <span class="balance-amount" id="userBalance">$1000.00</span>
+                    </div>
+                    <div class="balance-footer">
+                        <span class="balance-stats" id="balanceStats">No settled bets yet</span>
+                        <button id="resetBalance" class="reset-balance-btn" type="button" title="Reset balance and history">Reset</button>
                     </div>
                 </div>
 
@@ -87,7 +91,14 @@
                             <div class="bet-input-section">
                                 <div class="bet-amount-input">
                                     <label for="betAmount">Stake Amount</label>
-                                    <input type="number" id="betAmount" min="1" max="1000" step="1" placeholder="10">
+                                    <input type="number" id="betAmount" min="1" step="1" placeholder="10">
+                                    <div class="quick-stakes">
+                                        <button type="button" class="quick-stake" data-stake="10">$10</button>
+                                        <button type="button" class="quick-stake" data-stake="25">$25</button>
+                                        <button type="button" class="quick-stake" data-stake="50">$50</button>
+                                        <button type="button" class="quick-stake" data-stake="100">$100</button>
+                                        <button type="button" class="quick-stake" data-stake="max">Max</button>
+                                    </div>
                                 </div>
                                 
                                 <div class="potential-win">
@@ -111,17 +122,17 @@
                             <div class="teams-display">
                                 <div class="team red-team-info">
                                     <span class="team-icon">🔴</span>
-                                    <span class="team-name">Red Team</span>
+                                    <span class="team-name">Red Team <span class="team-formation" id="redFormation"></span></span>
                                 </div>
                                 <div class="vs-separator">VS</div>
                                 <div class="team blue-team-info">
                                     <span class="team-icon">🔵</span>
-                                    <span class="team-name">Blue Team</span>
+                                    <span class="team-name">Blue Team <span class="team-formation" id="blueFormation"></span></span>
                                 </div>
                             </div>
                             <div class="match-status">
                                 <span class="live-indicator">● LIVE</span>
-                                <span class="match-time" id="matchTime">45:00</span>
+                                <span class="match-time" id="matchTime">Pre-match</span>
                             </div>
                         </div>
                     </div>
@@ -316,12 +327,14 @@
     <!-- Goal Celebration Popups -->
     <div id="goalPopup" class="goal-popup">
         <div class="goal-content">
-            <video id="goalVideo" autoplay muted loop>
+            <video id="goalVideo" muted playsinline>
                 <source id="goalVideoSource" src="" type="video/mp4">
-                <img id="goalImage" src="" alt="Goal!" />
             </video>
+            <!-- Shown if the video can't play (must live outside <video> to be visible) -->
+            <img id="goalImage" src="" alt="Goal!" />
             <div id="goalText">GOAL!</div>
             <div id="goalScore"></div>
+            <div class="goal-skip-hint">Click to skip</div>
         </div>
     </div>
 

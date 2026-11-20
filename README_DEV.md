@@ -1,78 +1,56 @@
-# Marble Football Developer Guide
+# Marble Football – Developer Guide
 
-## Module Overview
+A marble-physics football match rendered with PIXI.js, with a live betting dashboard.
+No build step: open `index.html` through any static server (e.g. `python3 -m http.server`).
 
-```
-src/
-├── core/
-│   ├── EventBus.js          # Lightweight event emitter shared across modules
-│   ├── GameState.js         # Centralised match state object
-│   ├── Logger.js            # Environment-aware logging helper
-│   ├── TimerManager.js      # Single source of truth for timeouts/intervals
-│   ├── gameManager.js       # Wires the engine and betting systems together
-│   └── stateManager.js      # Mutators for GameState
-├── engine/
-│   ├── GameEngine.js        # Match loop, physics, goal handling
-│   ├── Renderer.js          # PIXI scene setup, scoreboard and overlays
-│   ├── formation.js         # Formation strength calculators
-│   └── physics.js           # Collision and restricted area helpers
-├── ui/
-│   ├── DOMController.js     # All DOM querying and mutations
-│   └── UIInitializer.js     # UI events, button wiring, UI reactions
-├── betting/
-│   ├── BetManager.js        # Betting lifecycle, event reactions, odds
-│   └── odds.js              # Odds and probability helpers (unit-tested)
-├── data/
-│   ├── formations.js        # Formation coordinate templates
-│   └── historicalStats.js   # Pre-computed betting distributions
-├── config/
-│   └── constants.js         # Game configuration constants
-└── index.js                 # Entry point that boots the game & UI
-```
+## Files
 
-## Game Flow Diagram
+| File | Purpose |
+| --- | --- |
+| `index.html` | Page layout: pitch container, controls, bet slip, markets, bet lists, goal popup |
+| `script.js` | All game and betting logic (sections listed below) |
+| `style.css` | Page, overlay and goal-popup styles |
+| `betting-ui.css` | Betting dashboard styles |
+| `Video_of_Goal_Celebration*.mp4` | Goal celebration clips (red / blue) |
+| `tools/calibrate.js` | Re-simulates matches with the real engine to regenerate the odds model |
 
-```
-+-------------+      initGame()        +----------------+
-|  index.js   | ---------------------> | core/gameManager|
-+-------------+                        +----------------+
-        |                                      |
-        | initUI()                             | init()
-        v                                      v
-+----------------+         ticker loop   +----------------+
-| ui/UIInitializer| <------------------->| engine/GameEngine|
-+----------------+                        +----------------+
-        |                                      |
-        | DOM actions                          | eventBus.emit()
-        v                                      v
-+----------------+                        +----------------+
-| ui/DOMController| <-------------------- | core/EventBus  |
-+----------------+                        +----------------+
-        ^                                      |
-        | odds updates                         |
-+----------------+                        +----------------+
-| betting/BetMgr | ----------------------> | ui/DOMController|
-+----------------+                        +----------------+
-```
+## `script.js` sections
 
-1. `index.js` boots both the engine (`initGame`) and UI wiring (`initUI`).
-2. `gameManager` instantiates the `GameEngine` and `BetManager` which subscribe to the shared `eventBus`.
-3. `GameEngine` owns the PIXI ticker, updates `GameState` through `stateManager`, and emits lifecycle events (`goal`, `halftime`, `fulltime`, `matchEnd`, `bettingStart`, `bettingClose`).
-4. `BetManager` listens to those events to open/close markets and update odds, using the DOM controller helpers to touch the UI.
-5. All DOM touching (querying, updating text, toggling styles) lives in `ui/DOMController`, keeping rendering logic (`Renderer`) PIXI-only.
-6. Timers and intervals go through `core/TimerManager` so a cleanup call clears the whole simulation safely.
+1. **Setup** – constants, match state, formations, PIXI app.
+2. **Game objects** – pitch, marble players, locally drawn ball, on-pitch messages.
+3. **Game logic** – restricted areas, match clock, halftime/full-time, collisions, goals.
+4. **Game loop** – fixed-size sub-steps: one step equals one 60fps frame at 1x speed.
+   `ticker.deltaTime × gameSpeed` is split into steps of at most 1, so the pace is the same
+   on any refresh rate and the ball can't tunnel through players at high speed.
+5. **Match lifecycle** – `startNextMatch()` → pre-match betting window → `startPlay()` →
+   halftime window → `startSecondHalf()` → `finishMatch()` (records result, settles bets).
+   `matchEpoch` / `scheduleForMatch()` make delayed callbacks from an older match no-ops.
+6. **Betting** – odds from `historicalStats` (1000 simulated matches as a prior, updated after
+   every match played), Poisson live odds at halftime, bet slip, settlement, bet history.
+7. **Persistence** – balance, bet history and learned stats are saved to `localStorage`
+   (`marbleFootball.v1`). Pending stakes are refunded if the page is closed mid-match.
 
-## Testing
+## Recalculating the odds
 
-Unit tests (Vitest) cover the probabilistic utilities and physics helpers:
-
-- `calculateOdds`
-- `calculateCombinedOverProbability`
-- `resolveCollision`
-- `enforceRestrictedGoalAreas`
-
-Run them with:
+The odds come from `historicalStats` in `script.js`, generated by playing matches with the
+real engine (same step functions as the game loop at 1x speed, no rendering):
 
 ```bash
-npm test
+node tools/calibrate.js 5000 --write
 ```
+
+Run it after **any** change to player, ball or keeper behaviour, otherwise the odds no longer
+match the game. `--write` rewrites the block between the `CALIBRATED STATS` markers and bumps
+`modelVersion`, which makes players' browsers discard stats they learned under the old engine.
+Without `--write` it only prints the results. Needs Playwright with Chromium.
+
+Keeper behaviour is tuned with `GOALKEEPER_SPEED`, `KEEPER_REACTION` and `KEEPER_ANTICIPATION`.
+
+## Modes
+
+- **Single match (count = 1)**: continuous play with a 20s pre-match and 15s halftime
+  betting window, then the next match starts automatically.
+- **Batch (count > 1)**: betting windows are skipped and pauses shrink with game speed,
+  for quickly generating match data. Download results with *Download Match Data (CSV)*.
+
+Changing the series mid-match voids (refunds) any pending bets on that match.
