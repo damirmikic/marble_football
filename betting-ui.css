@@ -1037,3 +1037,92 @@ nhanced Betslip Styling */
     margin-top: 4px;
     font-style: italic;
 }
+
+/* --- Fixes & additions --- */
+
+/* The overlay's global .status-text rule (white) was making these invisible on the light bar */
+.betting-status .status-text {
+    color: inherit;
+}
+
+.balance-footer {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    gap: 8px;
+    margin-top: 10px;
+    font-size: 13px;
+    color: rgba(255, 255, 255, 0.85);
+}
+
+.balance-stats .pl-up { color: #4ade80; font-weight: 600; }
+.balance-stats .pl-down { color: #f87171; font-weight: 600; }
+
+.reset-balance-btn {
+    background: transparent;
+    border: 1px solid rgba(255, 255, 255, 0.5);
+    color: #fff;
+    border-radius: 4px;
+    padding: 4px 10px;
+    font-size: 12px;
+    cursor: pointer;
+}
+
+.reset-balance-btn:hover {
+    background: rgba(255, 255, 255, 0.15);
+}
+
+.quick-stakes {
+    display: flex;
+    gap: 6px;
+    margin-top: 8px;
+    flex-wrap: wrap;
+}
+
+.quick-stake {
+    flex: 1;
+    min-width: 44px;
+    padding: 6px 0;
+    font-size: 13px;
+    font-weight: 600;
+    background: #f1f5f9;
+    border: 1px solid #cbd5e1;
+    border-radius: 4px;
+    color: #1e293b;
+    cursor: pointer;
+}
+
+.quick-stake:hover {
+    background: #e2e8f0;
+}
+
+.team-formation {
+    display: block;
+    font-size: 11px;
+    font-weight: 500;
+    opacity: 0.7;
+}
+
+.goal-popup {
+    cursor: pointer;
+}
+
+.goal-skip-hint {
+    margin-top: 10px;
+    font-size: 13px;
+    color: rgba(255, 255, 255, 0.7);
+}
+
+/* Keep the in-canvas overlay timer dark (the dashboard .betting-timer rule above is light) */
+#overlayBettingTimer {
+    background: rgba(255, 193, 7, 0.2);
+    border: 1px solid #ffc107;
+    border-radius: 20px;
+    padding: 6px 12px;
+    min-width: 0;
+    font-size: 14px;
+}
+
+.match-time {
+    white-space: nowrap;
+}
