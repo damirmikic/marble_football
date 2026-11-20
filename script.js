@@ -813,8 +813,8 @@ function updateTimer(dt) {
         } else {
             // Price the second half, then open a 15-second live betting window.
             // closeBettingWindow() kicks off the second half when it expires.
-            updateLiveOdds();
-            startBettingTimer(15);
+            updateInPlayOdds();
+            startBettingTimer(15, 'halftime');
             showBetMessage('Halftime! Place your live bets now!', 'info');
         }
     } else if (gameHalf === 2 && timer >= halftimeSeconds * 2 && !injuryTimeStarted) {
@@ -1109,7 +1109,12 @@ function handleGoal(team) {
     showGameMessage(`GOAL!\n${teamName} Team Scores!\n${score.red} - ${score.blue}`, 2000);
     const epoch = matchEpoch;
     showGoalCelebration(team, () => {
-        if (epoch === matchEpoch) restart();
+        if (epoch !== matchEpoch) return;
+        // Short in-play betting window at the new score; closing it restarts play
+        resetToCenter();
+        updateInPlayOdds();
+        startBettingTimer(IN_PLAY_WINDOW_SECONDS, 'inplay');
+        showBetMessage(`Goal! In-play betting open for ${IN_PLAY_WINDOW_SECONDS} seconds at ${score.red}-${score.blue}`, 'info');
     });
 }
 
@@ -1380,7 +1385,7 @@ function startNextMatch() {
         scheduleForMatch(startPlay, pause(1000));
     } else {
         showGameMessage("NEW MATCH!\nBetting is open...", 3000);
-        startBettingTimer(20);
+        startBettingTimer(20, 'prematch');
         showBetMessage('New match starting! Place your bets now!', 'info');
     }
 
@@ -1583,6 +1588,9 @@ const formationRatings = {
 };
 
 const TOTAL_GOAL_LINES = [1.5, 2.5, 3.5];
+// Scores offered in the Correct Score market; anything else settles "Any other"
+const CORRECT_SCORES = ['0-0', '1-0', '0-1', '1-1', '2-0', '0-2', '2-1', '1-2', '2-2', '3-0', '0-3', '3-1', '1-3'];
+const correctScoreId = key => `cs${key.replace('-', '')}Odd`; // '2-1' -> 'cs21Odd'
 const FIRST_HALF_LINES = [0.5, 1.5, 2.5];
 const lineKey = line => String(line).replace('.', ''); // 2.5 -> '25' (matches element ids)
 const oddsSelector = (market, outcome) => `button[data-market="${market}"][data-outcome="${outcome}"]`;
@@ -1680,6 +1688,22 @@ function priceFullTimeMarkets(lambdaHome, lambdaAway) {
     } else {
         updateOddElement('blueCleanSheetOdd', oddsSelector('specials', 'blue-clean-sheet'), m.blueCleanSheet);
     }
+
+    // Correct score: scores already passed become impossible and close
+    let listed = 0;
+    CORRECT_SCORES.forEach(key => {
+        const prob = m.scores[key] || 0;
+        listed += prob;
+        const selector = oddsSelector('correct-score', key);
+        if (prob < 0.002) {
+            // Keep the score as the label so it's clear which one closed
+            const button = document.querySelector(selector);
+            disableMarketButton(button, button && button.dataset.label);
+        } else {
+            updateOddElement(correctScoreId(key), selector, prob);
+        }
+    });
+    updateOddElement('csOtherOdd', oddsSelector('correct-score', 'other'), Math.max(0, 1 - listed));
 }
 
 // Pre-match odds for the current formation pairing
@@ -1687,11 +1711,7 @@ function updateBettingOdds() {
     const xg = getExpectedGoals();
     priceFullTimeMarkets(xg.home, xg.away);
 
-    const firstHalf = marketProbabilities(xg.fhHome, xg.fhAway, 0, 0, FIRST_HALF_LINES);
-    FIRST_HALF_LINES.forEach(line => {
-        updateOddElement(`fhOver${lineKey(line)}Odd`, oddsSelector('fh-goals', `over-${line}`), firstHalf.over[line]);
-        updateOddElement(`fhUnder${lineKey(line)}Odd`, oddsSelector('fh-goals', `under-${line}`), 1 - firstHalf.over[line]);
-    });
+    priceFirstHalfMarkets(xg.fhHome, xg.fhAway);
 }
 
 /* --- BETTING STATE & PERSISTENCE --- */
@@ -1882,7 +1902,8 @@ function getMarketDisplayName(market) {
         'total-goals': 'Total Goals',
         'btts': 'Both Teams to Score',
         'fh-goals': 'First Half Goals',
-        'specials': 'Match Specials'
+        'specials': 'Match Specials',
+        'correct-score': 'Correct Score'
     };
     return marketNames[market] || market;
 }
@@ -2203,6 +2224,13 @@ function settleBets(matchResult) {
                 if (bet.outcome === 'no' && !matchResult.btts) status = 'won';
                 break;
 
+            case 'correct-score': {
+                const finalScore = `${matchResult.homeGoals}-${matchResult.awayGoals}`;
+                if (bet.outcome === finalScore) status = 'won';
+                if (bet.outcome === 'other' && !CORRECT_SCORES.includes(finalScore)) status = 'won';
+                break;
+            }
+
             case 'specials':
                 if (bet.outcome === 'red-clean-sheet' && matchResult.awayGoals === 0) status = 'won';
                 if (bet.outcome === 'blue-clean-sheet' && matchResult.homeGoals === 0) status = 'won';
@@ -2252,9 +2280,13 @@ function checkGameState() {
 setInterval(checkGameState, 1000);
 
 // Betting timer and message functions
-function startBettingTimer(seconds = 20) {
+const IN_PLAY_WINDOW_SECONDS = 8;
+let bettingPhase = 'prematch'; // 'prematch' | 'halftime' | 'inplay' - decides what closing the window does
+
+function startBettingTimer(seconds = 20, phase = 'prematch') {
     bettingTimeLeft = seconds;
     bettingWindowOpen = true;
+    bettingPhase = phase;
 
     if (bettingTimer) clearInterval(bettingTimer);
 
@@ -2266,7 +2298,7 @@ function startBettingTimer(seconds = 20) {
         bettingTimeLeft--;
         updateBettingTimerDisplay();
 
-        if (bettingTimeLeft === 10 || bettingTimeLeft === 5) {
+        if ((bettingTimeLeft === 10 || bettingTimeLeft === 5) && bettingTimeLeft < seconds) {
             showBetMessage(`Betting closes in ${bettingTimeLeft} seconds!`, 'warning');
         } else if (bettingTimeLeft <= 0) {
             closeBettingWindow();
@@ -2289,15 +2321,16 @@ function closeBettingWindow({ kickOff = true } = {}) {
 
     if (!kickOff) return;
 
-    if (!gameStarted && !gameRunning) {
-        // Pre-match window closed: kick off
+    if (bettingPhase === 'prematch') {
         showBetMessage('Betting window closed - match starting!', 'warning');
         showGameMessage("KICK OFF!", 1000);
         scheduleForMatch(startPlay, 1000);
-    } else if (gameHalf === 1 && !gameRunning) {
-        // Halftime window closed: start the second half
+    } else if (bettingPhase === 'halftime') {
         showBetMessage('Halftime betting closed - 2nd half starting!', 'warning');
         startSecondHalf();
+    } else if (bettingPhase === 'inplay') {
+        showBetMessage('In-play betting closed - play restarts!', 'warning');
+        scheduleForMatch(startPlay, 500);
     }
 }
 
@@ -2398,17 +2431,70 @@ function poissonProbability(k, lambda) {
     return (part1 * part2) / part3;
 }
 
-/**
- * Halftime odds: price the second half on top of the current score.
- */
-function updateLiveOdds() {
-    const xg = getExpectedGoals();
-    priceFullTimeMarkets(Math.max(0.01, xg.home - xg.fhHome), Math.max(0.01, xg.away - xg.fhAway));
+// Average injury time added to each half (see updateTimer), for pricing the time left
+const AVG_INJURY_TIME = { first: 2, second: 4.5 };
 
-    // First-half markets are decided at halftime
-    document.querySelectorAll('button[data-market="fh-goals"]').forEach(btn => {
-        disableMarketButton(btn, "Market Closed");
+/**
+ * Goals each team is still expected to score from now on, scaled by the time left.
+ * Once injury time is announced its real length is used.
+ */
+function remainingExpectedGoals() {
+    const xg = getExpectedGoals();
+    const secondHalf = {
+        home: Math.max(0.01, xg.home - xg.fhHome),
+        away: Math.max(0.01, xg.away - xg.fhAway)
+    };
+    const fractionLeft = (start, nominalLength, avgInjury, actualInjury) => {
+        const end = start + nominalLength + (injuryTimeStarted ? actualInjury : avgInjury);
+        return Math.max(0, Math.min(1, (end - timer) / (nominalLength + avgInjury)));
+    };
+
+    if (gameHalf === 1) {
+        const left = fractionLeft(0, halftimeSeconds, AVG_INJURY_TIME.first, injuryTime.first);
+        return {
+            fhHome: xg.fhHome * left,
+            fhAway: xg.fhAway * left,
+            home: xg.fhHome * left + secondHalf.home,
+            away: xg.fhAway * left + secondHalf.away,
+            firstHalfOpen: left > 0
+        };
+    }
+    const left = fractionLeft(halftimeSeconds, halftimeSeconds, AVG_INJURY_TIME.second, injuryTime.second);
+    return { fhHome: 0, fhAway: 0, home: secondHalf.home * left, away: secondHalf.away * left, firstHalfOpen: false };
+}
+
+// First-half goal lines on top of the first-half score so far
+function priceFirstHalfMarkets(lambdaHome, lambdaAway, homeNow = 0, awayNow = 0) {
+    const m = marketProbabilities(lambdaHome, lambdaAway, homeNow, awayNow, FIRST_HALF_LINES);
+    FIRST_HALF_LINES.forEach(line => {
+        const over = oddsSelector('fh-goals', `over-${line}`);
+        const under = oddsSelector('fh-goals', `under-${line}`);
+        if (homeNow + awayNow > line) {
+            disableMarketButton(document.querySelector(over), 'Settled (Over)');
+            disableMarketButton(document.querySelector(under), 'Settled (Over)');
+            return;
+        }
+        updateOddElement(`fhOver${lineKey(line)}Odd`, over, m.over[line]);
+        updateOddElement(`fhUnder${lineKey(line)}Odd`, under, 1 - m.over[line]);
     });
+}
+
+/**
+ * Live odds (halftime and after goals): price the rest of the match on top of the
+ * current score. Markets that are already decided are closed.
+ */
+function updateInPlayOdds() {
+    const xg = remainingExpectedGoals();
+    priceFullTimeMarkets(xg.home, xg.away);
+
+    if (xg.firstHalfOpen) {
+        priceFirstHalfMarkets(xg.fhHome, xg.fhAway, currentMatch.firstHalfHomeGoals, currentMatch.firstHalfAwayGoals);
+    } else {
+        // First-half markets are decided at halftime
+        document.querySelectorAll('button[data-market="fh-goals"]').forEach(btn => {
+            disableMarketButton(btn, "Market Closed");
+        });
+    }
 }
 
 /**
@@ -2591,7 +2677,7 @@ function boot() {
     startGameWhenReady();
     try {
         initializeBetting();
-        startBettingTimer(20); // Initial pre-match betting window
+        startBettingTimer(20, 'prematch'); // Initial pre-match betting window
         showBetMessage('Welcome! Betting window is open - place your bets!', 'info');
     } catch (error) {
         console.error('Error initializing betting system:', error);

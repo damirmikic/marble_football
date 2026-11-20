@@ -1126,3 +1126,25 @@ nhanced Betslip Styling */
 .match-time {
     white-space: nowrap;
 }
+
+/* Correct score grid */
+.correct-score-card {
+    grid-column: 1 / -1;
+    border-right: none !important;
+}
+
+.cs-odds {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(84px, 1fr));
+    gap: 6px;
+}
+
+.cs-odds .odds-btn.compact {
+    flex-direction: column;
+    gap: 2px;
+    padding: 8px 4px;
+}
+
+.cs-odds .cs-other {
+    grid-column: span 2;
+}
