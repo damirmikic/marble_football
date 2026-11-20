@@ -44,7 +44,16 @@ match the game. `--write` rewrites the block between the `CALIBRATED STATS` mark
 `modelVersion`, which makes players' browsers discard stats they learned under the old engine.
 Without `--write` it only prints the results. Needs Playwright with Chromium.
 
-Keeper behaviour is tuned with `GOALKEEPER_SPEED`, `KEEPER_REACTION` and `KEEPER_ANTICIPATION`.
+Behaviour knobs (all at the top of `script.js`):
+- Keepers: `GOALKEEPER_SPEED`, `KEEPER_REACTION`, `KEEPER_ANTICIPATION`.
+- Outfield players: `ROLE_BEHAVIOUR` - each role (defender / midfielder / forward) is pulled
+  towards its spot in the formation's playing shape (`FORMATION_DEPTH.shape`), the shape slides
+  with the ball, and forwards chase the ball in the opponent's half.
+
+Formations are uniformly random, so the pooled results are the overall model and the fitted
+`formationRatings` (attack / defence, 1 = average) adjust each match's expected goals:
+`expected red goals = avgHomeGoals × attack[red formation] × defence[blue formation]`.
+All markets are then priced from those expected goals with a Poisson model.
 
 ## Modes
 
