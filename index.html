@@ -11,24 +11,38 @@
 </head>
 
 <body>
-    <h1>Marble Football</h1>
-    <div class="ui-container">
-        <div id="timer">Half: 1 - 00'</div>
-        <div id="score">Red: 0 - Blue: 0</div>
-        <div id="speedDisplay">Speed: 1.0x</div>
-    </div>
+    <header class="topbar">
+        <h1>Marble Football</h1>
+        <div class="toolbar">
+            <div class="speed-buttons" role="group" aria-label="Game speed">
+                <span class="toolbar-label">Speed</span>
+                <button type="button" class="speed-btn active" data-speed="1">1x</button>
+                <button type="button" class="speed-btn" data-speed="2">2x</button>
+                <button type="button" class="speed-btn" data-speed="5">5x</button>
+                <button type="button" class="speed-btn" data-speed="10">10x</button>
+            </div>
+            <button type="button" id="soundToggle" class="icon-btn" aria-pressed="true" title="Sound on/off">🔊</button>
+            <details class="sim-panel" id="simPanel">
+                <summary>Simulate a series</summary>
+                <div class="sim-body">
+                    <label>Matches <input type="number" id="matchCount" value="10" min="1" max="1000"></label>
+                    <label>Speed <input type="number" id="gameSpeed" value="1" min="0.1" max="50" step="0.1"></label>
+                    <button type="button" id="startMatches">Start</button>
+                    <button type="button" id="downloadCSV" style="display:none;">Download CSV</button>
+                </div>
+                <p class="sim-hint">Plays matches back to back with betting off, for generating match data.</p>
+            </details>
+        </div>
+        <div id="matchProgress" aria-live="polite"></div>
+        <!-- Legacy readouts kept for script compatibility; the pitch status bar shows the same -->
+        <div class="legacy-readouts" hidden>
+            <div id="timer">Half: 1 - 00'</div>
+            <div id="score">Red: 0 - Blue: 0</div>
+            <div id="speedDisplay">Speed: 1.0x</div>
+        </div>
+    </header>
     <div class="main-container">
         <div class="game-section">
-            <div class="match-config">
-                <label for="matchCount">Number of matches to simulate:</label>
-                <input type="number" id="matchCount" value="1" min="1" max="1000">
-                <label for="gameSpeed">Game Speed:</label>
-                <input type="number" id="gameSpeed" value="1" min="0.1" max="50" step="0.1" placeholder="1.0">
-                <button id="testSpeed" type="button">Test 5x Speed</button>
-                <button id="startMatches">Start Matches</button>
-                <button id="downloadCSV" style="display:none;">Download Match Data (CSV)</button>
-                <div id="matchProgress"></div>
-            </div>
             <div class="game-canvas-container" id="gameCanvasContainer">
                 <!-- Game overlay with timer and status -->
                 <div class="game-overlay">
@@ -290,13 +304,79 @@
                                 </button>
                             </div>
                         </div>
+
+                        <!-- Correct Score -->
+                        <div class="market-card correct-score-card">
+                            <div class="market-title-bar">
+                                <h4 class="market-name">Correct Score</h4>
+                                <span class="market-info">Full Time · Red-Blue</span>
+                            </div>
+                            <div class="odds-container cs-odds">
+                                <button class="odds-btn compact" data-market="correct-score" data-outcome="0-0" data-odd="1.00">
+                                    <span class="selection">0-0</span>
+                                    <span class="odds-value" id="cs00Odd">-</span>
+                                </button>
+                                <button class="odds-btn compact" data-market="correct-score" data-outcome="1-0" data-odd="1.00">
+                                    <span class="selection">1-0</span>
+                                    <span class="odds-value" id="cs10Odd">-</span>
+                                </button>
+                                <button class="odds-btn compact" data-market="correct-score" data-outcome="0-1" data-odd="1.00">
+                                    <span class="selection">0-1</span>
+                                    <span class="odds-value" id="cs01Odd">-</span>
+                                </button>
+                                <button class="odds-btn compact" data-market="correct-score" data-outcome="1-1" data-odd="1.00">
+                                    <span class="selection">1-1</span>
+                                    <span class="odds-value" id="cs11Odd">-</span>
+                                </button>
+                                <button class="odds-btn compact" data-market="correct-score" data-outcome="2-0" data-odd="1.00">
+                                    <span class="selection">2-0</span>
+                                    <span class="odds-value" id="cs20Odd">-</span>
+                                </button>
+                                <button class="odds-btn compact" data-market="correct-score" data-outcome="0-2" data-odd="1.00">
+                                    <span class="selection">0-2</span>
+                                    <span class="odds-value" id="cs02Odd">-</span>
+                                </button>
+                                <button class="odds-btn compact" data-market="correct-score" data-outcome="2-1" data-odd="1.00">
+                                    <span class="selection">2-1</span>
+                                    <span class="odds-value" id="cs21Odd">-</span>
+                                </button>
+                                <button class="odds-btn compact" data-market="correct-score" data-outcome="1-2" data-odd="1.00">
+                                    <span class="selection">1-2</span>
+                                    <span class="odds-value" id="cs12Odd">-</span>
+                                </button>
+                                <button class="odds-btn compact" data-market="correct-score" data-outcome="2-2" data-odd="1.00">
+                                    <span class="selection">2-2</span>
+                                    <span class="odds-value" id="cs22Odd">-</span>
+                                </button>
+                                <button class="odds-btn compact" data-market="correct-score" data-outcome="3-0" data-odd="1.00">
+                                    <span class="selection">3-0</span>
+                                    <span class="odds-value" id="cs30Odd">-</span>
+                                </button>
+                                <button class="odds-btn compact" data-market="correct-score" data-outcome="0-3" data-odd="1.00">
+                                    <span class="selection">0-3</span>
+                                    <span class="odds-value" id="cs03Odd">-</span>
+                                </button>
+                                <button class="odds-btn compact" data-market="correct-score" data-outcome="3-1" data-odd="1.00">
+                                    <span class="selection">3-1</span>
+                                    <span class="odds-value" id="cs31Odd">-</span>
+                                </button>
+                                <button class="odds-btn compact" data-market="correct-score" data-outcome="1-3" data-odd="1.00">
+                                    <span class="selection">1-3</span>
+                                    <span class="odds-value" id="cs13Odd">-</span>
+                                </button>
+                                <button class="odds-btn compact cs-other" data-market="correct-score" data-outcome="other" data-odd="1.00">
+                                    <span class="selection">Any other</span>
+                                    <span class="odds-value" id="csOtherOdd">-</span>
+                                </button>
+                            </div>
+                        </div>
                     </div>
 
                     <!-- Live Betting Notice -->
                     <div class="live-notice">
                         <div class="notice-content">
                             <span class="notice-icon">⚡</span>
-                            <span class="notice-text">Live betting - odds change in real time</span>
+                            <span class="notice-text">Live betting opens before kick-off, at halftime and after every goal</span>
                         </div>
                     </div>
                 </div>
@@ -320,9 +400,6 @@
 
         </div>
     </div>
-    </div>
-
-
 
     <!-- Goal Celebration Popups -->
     <div id="goalPopup" class="goal-popup">

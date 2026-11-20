@@ -20,9 +20,18 @@ const GOAL_HEIGHT = 100;
 const GOAL_DEPTH = 16;
 const CANVAS_WIDTH = SCREEN_WIDTH + GOAL_DEPTH * 2;
 const MAX_PLAYER_SPEED = 8.5;
-const GOALKEEPER_SPEED = 2.2;      // Keeper's top speed along the goal line
-const KEEPER_REACTION = 0.04;      // How quickly a keeper changes velocity (0-1 per step); lower = slower to react
-const KEEPER_ANTICIPATION = 3;     // Steps ahead the keeper predicts the ball's y when it's coming at goal
+const GOALKEEPER_SPEED = 2.5;      // Keeper's top speed along the goal line
+const KEEPER_REACTION = 0.12;      // How quickly a keeper changes velocity (0-1 per step); lower = slower to react
+const KEEPER_ANTICIPATION = 6;     // Steps ahead the keeper predicts the ball's y when it's coming at goal
+// Team shape: outfield players are pulled (like a soft spring) towards their formation
+// spot, and the whole shape slides with the ball, so formations matter beyond kick-off.
+// Each role has its own discipline: pull = spring strength, shiftX/shiftY = how far it
+// follows the ball, chase = pull towards the ball itself when it's in the opponent's half.
+const ROLE_BEHAVIOUR = {
+    defender: { pull: 0.004, shiftX: 0.25, shiftY: 0.3, chase: 0 },
+    midfielder: { pull: 0.003, shiftX: 0.4, shiftY: 0.3, chase: 0 },
+    forward: { pull: 0.002, shiftX: 0.4, shiftY: 0.4, chase: 0.004 }
+};     // Steps ahead the keeper predicts the ball's y when it's coming at goal
 const MAX_BALL_SPEED = 12.5;
 
 // Field dimensions
@@ -375,6 +384,9 @@ function createPlayer(team, x, y, isGoalkeeper = false) {
 
     player.x = x;
     player.y = y;
+    // Formation spot this player returns to
+    player.homeX = x;
+    player.homeY = y;
 
     // Custom properties
     player.team = team;
@@ -394,7 +406,15 @@ function getRandomFormation() {
     return formationNames[Math.floor(Math.random() * formationNames.length)];
 }
 
-function positionPlayersInFormation(team, formationName) {
+// Depth along the pitch (fraction from own goal line) for a formation's relative x.
+// Kick-off keeps everyone in their own half; the playing shape stretches into the
+// opponent's half, so formations with more forwards really do commit more to attack.
+const FORMATION_DEPTH = {
+    kickoff: { start: 0.15, range: 0.3 },
+    shape: { start: 0.08, range: 0.9 }
+};
+
+function positionPlayersInFormation(team, formationName, layout = 'kickoff') {
     const formation = formations[formationName];
     const isRed = team === 'red';
     const fieldWidth = SCREEN_WIDTH;
@@ -404,49 +424,56 @@ function positionPlayersInFormation(team, formationName) {
 
     // Combine all field positions
     const allPositions = [
-        ...formation.defenders,
-        ...formation.midfielders,
-        ...formation.forwards
+        ...formation.defenders.map(pos => ({ ...pos, role: 'defender' })),
+        ...formation.midfielders.map(pos => ({ ...pos, role: 'midfielder' })),
+        ...formation.forwards.map(pos => ({ ...pos, role: 'forward' }))
     ];
 
     // Convert relative positions to absolute coordinates
     allPositions.forEach(pos => {
         let x, y;
 
-        if (isRed) {
-            // Red team on left side - more compact and closer to center
-            x = (fieldWidth * 0.15) + (pos.x * (fieldWidth * 0.3)); // Start at 15% and use 30% of field width
-            y = pos.y * (fieldHeight - 120) + 60; // More vertical margin, tighter formation
-        } else {
-            // Blue team on right side (mirror formation) - more compact and closer to center
-            x = (fieldWidth * 0.55) + (pos.x * (fieldWidth * 0.3)); // Start at 55% and use 30% of field width
-            y = pos.y * (fieldHeight - 120) + 60; // More vertical margin, tighter formation
-        }
+        // pos.x runs from own goal (0) towards the opponent
+        const { start, range } = FORMATION_DEPTH[layout];
+        const depth = fieldWidth * (start + pos.x * range);
+        // Red attacks left-to-right; Blue is mirrored so its defenders also sit nearest its own goal
+        x = isRed ? depth : fieldWidth - depth;
+        y = pos.y * (fieldHeight - 120) + 60; // More vertical margin, tighter formation
 
-        positions.push({ x, y });
+        positions.push({ x, y, role: pos.role });
     });
 
     return positions;
 }
 
 function createAllPlayers() {
-    // Get positions for both teams (formations should already be set)
-    const redPositions = positionPlayersInFormation('red', currentMatch.homeFormation || '4-4-2');
-    const bluePositions = positionPlayersInFormation('blue', currentMatch.awayFormation || '4-4-2');
-    // Team Red (Left side)
-    // 1 Goalkeeper
-    createPlayer('red', GOAL_BOX_WIDTH / 2, SCREEN_HEIGHT / 2, true);
-    // 10 Field players in formation
-    for (let i = 0; i < 10; i++) {
-        createPlayer('red', redPositions[i].x, redPositions[i].y);
-    }
+    const homeFormation = currentMatch.homeFormation || '4-4-2';
+    const awayFormation = currentMatch.awayFormation || '4-4-2';
 
-    // Team Blue (Right side)
-    // 1 Goalkeeper
+    // Team Red (left side): goalkeeper + 10 outfield players
+    createPlayer('red', GOAL_BOX_WIDTH / 2, SCREEN_HEIGHT / 2, true);
+    positionPlayersInFormation('red', homeFormation).forEach(pos => createPlayer('red', pos.x, pos.y));
+
+    // Team Blue (right side)
     createPlayer('blue', SCREEN_WIDTH - GOAL_BOX_WIDTH / 2, SCREEN_HEIGHT / 2, true);
-    // 10 Field players in formation
-    for (let i = 0; i < 10; i++) {
-        createPlayer('blue', bluePositions[i].x, bluePositions[i].y);
+    positionPlayersInFormation('blue', awayFormation).forEach(pos => createPlayer('blue', pos.x, pos.y));
+
+    assignShapePositions();
+}
+
+// Give each outfield player their spot in the team's playing shape
+function assignShapePositions() {
+    const shapes = {
+        red: positionPlayersInFormation('red', currentMatch.homeFormation || '4-4-2', 'shape'),
+        blue: positionPlayersInFormation('blue', currentMatch.awayFormation || '4-4-2', 'shape')
+    };
+    const index = { red: 0, blue: 0 };
+    for (const player of players) {
+        if (player.isGoalkeeper) continue;
+        const spot = shapes[player.team][index[player.team]++];
+        player.homeX = spot.x;
+        player.homeY = spot.y;
+        player.role = spot.role;
     }
 }
 
@@ -548,6 +575,8 @@ function resetToCenter() {
             }
         }
     }
+
+    assignShapePositions();
 }
 
 function startPlay() {
@@ -578,6 +607,7 @@ function startPlay() {
 
     gameRunning = true;
     gameStarted = true;
+    Sound.whistle(1);
 
     // Immediately sync overlay to show markets as suspended
     syncOverlayWithGameState();
@@ -777,6 +807,7 @@ function updateTimer(dt) {
     } else if (gameHalf === 1 && timer >= halftimeSeconds + injuryTime.first) {
         gameRunning = false; // Stop the game
         showGameMessage("HALF TIME!", 3000);
+        Sound.whistle(2);
 
         if (autoMode) {
             // No betting in batch simulation - go straight to the second half
@@ -784,8 +815,8 @@ function updateTimer(dt) {
         } else {
             // Price the second half, then open a 15-second live betting window.
             // closeBettingWindow() kicks off the second half when it expires.
-            updateLiveOdds();
-            startBettingTimer(15);
+            updateInPlayOdds();
+            startBettingTimer(15, 'halftime');
             showBetMessage('Halftime! Place your live bets now!', 'info');
         }
     } else if (gameHalf === 2 && timer >= halftimeSeconds * 2 && !injuryTimeStarted) {
@@ -797,6 +828,7 @@ function updateTimer(dt) {
         // Game Over
         gameRunning = false;
         gameStarted = false;
+        Sound.whistle(3);
         finishMatch(); // Records the result and settles bets
 
         if (autoMode && currentMatchNumber < totalMatches) {
@@ -902,6 +934,7 @@ function resolveBallPlayerCollision(ball, player) {
         ball.vx = (ball.vx / speed) * MAX_BALL_SPEED;
         ball.vy = (ball.vy / speed) * MAX_BALL_SPEED;
     }
+    Sound.kick(Math.min(speed, MAX_BALL_SPEED));
 }
 
 /* --- 4. GAME LOOP (UPDATE) FUNCTIONS --- */
@@ -950,6 +983,20 @@ function updatePlayers(dt = 1) {
             // Add a small random "nudge" to velocity
             player.vx += (Math.random() - 0.5) * 0.2 * dt;
             player.vy += (Math.random() - 0.5) * 0.2 * dt;
+
+            // Hold the team's shape: spring towards the formation spot, shifted with the ball
+            const role = ROLE_BEHAVIOUR[player.role] || ROLE_BEHAVIOUR.midfielder;
+            const targetX = player.homeX + (ball.x - SCREEN_WIDTH / 2) * role.shiftX;
+            const targetY = player.homeY + (ball.y - SCREEN_HEIGHT / 2) * role.shiftY;
+            player.vx += (targetX - player.x) * role.pull * dt;
+            player.vy += (targetY - player.y) * role.pull * dt;
+
+            // Forwards attack the ball once it's in the opponent's half
+            const ballInAttackingHalf = player.team === 'red' ? ball.x > SCREEN_WIDTH / 2 : ball.x < SCREEN_WIDTH / 2;
+            if (role.chase && ballInAttackingHalf) {
+                player.vx += (ball.x - player.x) * role.chase * dt;
+                player.vy += (ball.y - player.y) * role.chase * dt;
+            }
 
             // Clamp speed
             const speed = Math.sqrt(player.vx * player.vx + player.vy * player.vy);
@@ -1051,6 +1098,7 @@ function handleGoal(team) {
     updateScore();
     gameRunning = false;
     flashGoal(team);
+    Sound.goal();
 
     const restart = () => {
         resetToCenter();
@@ -1066,7 +1114,12 @@ function handleGoal(team) {
     showGameMessage(`GOAL!\n${teamName} Team Scores!\n${score.red} - ${score.blue}`, 2000);
     const epoch = matchEpoch;
     showGoalCelebration(team, () => {
-        if (epoch === matchEpoch) restart();
+        if (epoch !== matchEpoch) return;
+        // Short in-play betting window at the new score; closing it restarts play
+        resetToCenter();
+        updateInPlayOdds();
+        startBettingTimer(IN_PLAY_WINDOW_SECONDS, 'inplay');
+        showBetMessage(`Goal! In-play betting open for ${IN_PLAY_WINDOW_SECONDS} seconds at ${score.red}-${score.blue}`, 'info');
     });
 }
 
@@ -1281,8 +1334,10 @@ function cleanupGameObjects() {
 function updateFormationLabels() {
     const red = document.getElementById('redFormation');
     const blue = document.getElementById('blueFormation');
-    if (red) red.textContent = currentMatch.homeFormation || '';
-    if (blue) blue.textContent = currentMatch.awayFormation || '';
+    // Formation plus the goals the odds model expects from this pairing
+    const xg = getExpectedGoals();
+    if (red) red.textContent = `${currentMatch.homeFormation || ''} · xG ${xg.home.toFixed(2)}`;
+    if (blue) blue.textContent = `${currentMatch.awayFormation || ''} · xG ${xg.away.toFixed(2)}`;
 }
 
 function startNextMatch() {
@@ -1335,7 +1390,7 @@ function startNextMatch() {
         scheduleForMatch(startPlay, pause(1000));
     } else {
         showGameMessage("NEW MATCH!\nBetting is open...", 3000);
-        startBettingTimer(20);
+        startBettingTimer(20, 'prematch');
         showBetMessage('New match starting! Place your bets now!', 'info');
     }
 
@@ -1439,6 +1494,9 @@ function updateGameSpeed() {
     gameSpeed = Math.max(0.1, Math.min(50, speed)); // Clamp between 0.1 and 50
 
     if (speedDisplay) speedDisplay.textContent = `Speed: ${gameSpeed.toFixed(1)}x`;
+    document.querySelectorAll('.speed-btn').forEach(btn => {
+        btn.classList.toggle('active', Number(btn.dataset.speed) === gameSpeed);
+    });
 }
 
 function initSpeedControl() {
@@ -1449,6 +1507,13 @@ function initSpeedControl() {
     updateGameSpeed();
     speedInput.addEventListener('input', updateGameSpeed);
     speedInput.addEventListener('change', updateGameSpeed);
+
+    document.querySelectorAll('.speed-btn').forEach(btn => {
+        btn.addEventListener('click', () => {
+            speedInput.value = btn.dataset.speed;
+            updateGameSpeed();
+        });
+    });
 
     if (testButton) {
         testButton.addEventListener('click', () => {
@@ -1478,19 +1543,19 @@ function startGameWhenReady() {
 // on this pitch is added in (see recordMatchInStats), so the odds keep learning.
 const historicalStats = {
     // BEGIN CALIBRATED STATS (generated by tools/calibrate.js --write)
-    modelVersion: 2, // bump invalidates stats learned in players' browsers
-    homeWins: 1889,
-    draws: 1245,
-    awayWins: 1866,
-    totalMatches: 5000,
-    homeGoals: { 0: 1202, 1: 1761, 2: 1220, 3: 590, 4: 169, 5: 48, 6: 7, 7: 2, 8: 1 },
-    awayGoals: { 0: 1238, 1: 1782, 2: 1213, 3: 535, 4: 176, 5: 46, 6: 9, 7: 1 },
-    firstHalfHome: { 0: 2508, 1: 1755, 2: 595, 3: 132, 4: 8, 5: 1, 7: 1 },
-    firstHalfAway: { 0: 2524, 1: 1768, 2: 577, 3: 112, 4: 18, 5: 1 },
-    avgHomeGoals: 1.39,
-    avgAwayGoals: 1.362,
-    avgFirstHalfHome: 0.677,
-    avgFirstHalfAway: 0.667
+    modelVersion: 3, // bump invalidates stats learned in players' browsers
+    homeWins: 3904,
+    draws: 2800,
+    awayWins: 4096,
+    totalMatches: 10800,
+    homeGoals: { 0: 2825, 1: 3785, 2: 2453, 3: 1149, 4: 440, 5: 120, 6: 24, 7: 4 },
+    awayGoals: { 0: 2807, 1: 3655, 2: 2506, 3: 1199, 4: 446, 5: 141, 6: 39, 7: 5, 8: 2 },
+    firstHalfHome: { 0: 5670, 1: 3583, 2: 1190, 3: 296, 4: 54, 5: 7 },
+    firstHalfAway: { 0: 5545, 1: 3588, 2: 1313, 3: 290, 4: 54, 5: 7, 6: 3 },
+    avgHomeGoals: 1.358,
+    avgAwayGoals: 1.392,
+    avgFirstHalfHome: 0.658,
+    avgFirstHalfAway: 0.681
     // END CALIBRATED STATS
 };
 
@@ -1525,101 +1590,143 @@ function calculateOdds(probability, margin = 0.05) {
     return Math.max(1.01, 1 / adjustedProb);
 }
 
-function calculateCombinedOverProbability(homeDistribution, awayDistribution, line) {
-    const homeKeys = Object.keys(homeDistribution || {});
-    const awayKeys = Object.keys(awayDistribution || {});
+// Attack/defence rating per formation (1 = average; attack > 1 scores more, defence < 1 concedes less)
+const formationRatings = {
+    // BEGIN FORMATION RATINGS (generated by tools/calibrate.js --write)
+    '4-4-2': { attack: 0.973, defence: 1.021 },
+    '3-5-2': { attack: 0.987, defence: 0.982 },
+    '4-3-3': { attack: 1.033, defence: 1.012 },
+    '4-3-2-1': { attack: 0.952, defence: 1.035 },
+    '4-2-3-1': { attack: 1.012, defence: 0.978 },
+    '3-4-3': { attack: 1.043, defence: 0.972 }
+    // END FORMATION RATINGS
+};
 
-    if (!homeKeys.length || !awayKeys.length) {
-        return 0;
-    }
+const TOTAL_GOAL_LINES = [1.5, 2.5, 3.5];
+// Scores offered in the Correct Score market; anything else settles "Any other"
+const CORRECT_SCORES = ['0-0', '1-0', '0-1', '1-1', '2-0', '0-2', '2-1', '1-2', '2-2', '3-0', '0-3', '3-1', '1-3'];
+const correctScoreId = key => `cs${key.replace('-', '')}Odd`; // '2-1' -> 'cs21Odd'
+const FIRST_HALF_LINES = [0.5, 1.5, 2.5];
+const lineKey = line => String(line).replace('.', ''); // 2.5 -> '25' (matches element ids)
+const oddsSelector = (market, outcome) => `button[data-market="${market}"][data-outcome="${outcome}"]`;
 
-    const homeTotal = homeKeys.reduce((sum, key) => sum + (homeDistribution[key] || 0), 0);
-    const awayTotal = awayKeys.reduce((sum, key) => sum + (awayDistribution[key] || 0), 0);
-
-    if (!homeTotal || !awayTotal) {
-        return 0;
-    }
-
-    let probability = 0;
-    for (const hKey of homeKeys) {
-        const homeGoals = Number(hKey);
-        const homeProb = (homeDistribution[hKey] || 0) / homeTotal;
-        if (!homeProb) continue;
-
-        for (const aKey of awayKeys) {
-            const awayGoals = Number(aKey);
-            if (homeGoals + awayGoals <= line) continue;
-
-            const awayProb = (awayDistribution[aKey] || 0) / awayTotal;
-            if (!awayProb) continue;
-
-            probability += homeProb * awayProb;
-        }
-    }
-
-    return probability;
+// Expected goals for this match's formation pairing: league average x attack x opposing defence
+function getExpectedGoals() {
+    const stats = historicalStats;
+    const rating = name => formationRatings[name] || { attack: 1, defence: 1 };
+    const red = rating(currentMatch.homeFormation);
+    const blue = rating(currentMatch.awayFormation);
+    const redFactor = red.attack * blue.defence;
+    const blueFactor = blue.attack * red.defence;
+    return {
+        home: stats.avgHomeGoals * redFactor,
+        away: stats.avgAwayGoals * blueFactor,
+        fhHome: stats.avgFirstHalfHome * redFactor,
+        fhAway: stats.avgFirstHalfAway * blueFactor
+    };
 }
 
-// Update betting odds display
+/**
+ * Probabilities of every market given the goals each team is still expected to
+ * score (independent Poisson) on top of the current score.
+ */
+function marketProbabilities(lambdaHome, lambdaAway, homeNow = 0, awayNow = 0, lines = TOTAL_GOAL_LINES) {
+    const MAX_GOALS = 10;
+    const homeProbs = [];
+    const awayProbs = [];
+    for (let k = 0; k <= MAX_GOALS; k++) {
+        homeProbs[k] = poissonProbability(k, Math.max(0, lambdaHome));
+        awayProbs[k] = poissonProbability(k, Math.max(0, lambdaAway));
+    }
+    // Renormalise to account for the truncated tail
+    const homeSum = homeProbs.reduce((a, b) => a + b, 0);
+    const awaySum = awayProbs.reduce((a, b) => a + b, 0);
+
+    const result = { homeWin: 0, draw: 0, awayWin: 0, btts: 0, redCleanSheet: 0, blueCleanSheet: 0, over: {}, scores: {} };
+    lines.forEach(line => { result.over[line] = 0; });
+
+    for (let h = 0; h <= MAX_GOALS; h++) {
+        for (let a = 0; a <= MAX_GOALS; a++) {
+            const prob = (homeProbs[h] / homeSum) * (awayProbs[a] / awaySum);
+            const home = homeNow + h;
+            const away = awayNow + a;
+
+            if (home > away) result.homeWin += prob;
+            else if (home < away) result.awayWin += prob;
+            else result.draw += prob;
+
+            lines.forEach(line => { if (home + away > line) result.over[line] += prob; });
+            if (home > 0 && away > 0) result.btts += prob;
+            if (away === 0) result.redCleanSheet += prob;
+            if (home === 0) result.blueCleanSheet += prob;
+            result.scores[`${home}-${away}`] = (result.scores[`${home}-${away}`] || 0) + prob;
+        }
+    }
+    return result;
+}
+
+// Price every full-time market from the goals still expected, closing ones already decided
+function priceFullTimeMarkets(lambdaHome, lambdaAway) {
+    const homeNow = score.red;
+    const awayNow = score.blue;
+    const m = marketProbabilities(lambdaHome, lambdaAway, homeNow, awayNow);
+
+    updateOddElement('redWinOdd', oddsSelector('1x2', 'red-win'), m.homeWin);
+    updateOddElement('drawOdd', oddsSelector('1x2', 'draw'), m.draw);
+    updateOddElement('blueWinOdd', oddsSelector('1x2', 'blue-win'), m.awayWin);
+
+    TOTAL_GOAL_LINES.forEach(line => {
+        if (homeNow + awayNow > line) {
+            disableMarketButton(document.querySelector(oddsSelector('total-goals', `over-${line}`)), 'Settled (Over)');
+            disableMarketButton(document.querySelector(oddsSelector('total-goals', `under-${line}`)), 'Settled (Over)');
+            return;
+        }
+        updateOddElement(`over${lineKey(line)}Odd`, oddsSelector('total-goals', `over-${line}`), m.over[line]);
+        updateOddElement(`under${lineKey(line)}Odd`, oddsSelector('total-goals', `under-${line}`), 1 - m.over[line]);
+    });
+
+    if (homeNow > 0 && awayNow > 0) {
+        disableMarketButton(document.querySelector(oddsSelector('btts', 'yes')), 'Settled (Yes)');
+        disableMarketButton(document.querySelector(oddsSelector('btts', 'no')), 'Settled (Yes)');
+    } else {
+        updateOddElement('bttsYesOdd', oddsSelector('btts', 'yes'), m.btts);
+        updateOddElement('bttsNoOdd', oddsSelector('btts', 'no'), 1 - m.btts);
+    }
+
+    if (awayNow > 0) {
+        disableMarketButton(document.querySelector(oddsSelector('specials', 'red-clean-sheet')), 'Settled (No)');
+    } else {
+        updateOddElement('redCleanSheetOdd', oddsSelector('specials', 'red-clean-sheet'), m.redCleanSheet);
+    }
+    if (homeNow > 0) {
+        disableMarketButton(document.querySelector(oddsSelector('specials', 'blue-clean-sheet')), 'Settled (No)');
+    } else {
+        updateOddElement('blueCleanSheetOdd', oddsSelector('specials', 'blue-clean-sheet'), m.blueCleanSheet);
+    }
+
+    // Correct score: scores already passed become impossible and close
+    let listed = 0;
+    CORRECT_SCORES.forEach(key => {
+        const prob = m.scores[key] || 0;
+        listed += prob;
+        const selector = oddsSelector('correct-score', key);
+        if (prob < 0.002) {
+            // Keep the score as the label so it's clear which one closed
+            const button = document.querySelector(selector);
+            disableMarketButton(button, button && button.dataset.label);
+        } else {
+            updateOddElement(correctScoreId(key), selector, prob);
+        }
+    });
+    updateOddElement('csOtherOdd', oddsSelector('correct-score', 'other'), Math.max(0, 1 - listed));
+}
+
+// Pre-match odds for the current formation pairing
 function updateBettingOdds() {
-    const stats = historicalStats;
-    const total = stats.totalMatches;
+    const xg = getExpectedGoals();
+    priceFullTimeMarkets(xg.home, xg.away);
 
-    // 1X2 Market
-    const homeWinProb = stats.homeWins / total;
-    const drawProb = stats.draws / total;
-    const awayWinProb = stats.awayWins / total;
-
-    updateOddElement('redWinOdd', 'button[data-outcome="red-win"]', homeWinProb);
-    updateOddElement('drawOdd', 'button[data-outcome="draw"]', drawProb);
-    updateOddElement('blueWinOdd', 'button[data-outcome="blue-win"]', awayWinProb);
-
-    // Total Goals Markets (Full Time)
-    const fullTimeGoalLines = [
-        { line: 1.5, key: '1.5', overId: 'over15Odd', underId: 'under15Odd' },
-        { line: 2.5, key: '2.5', overId: 'over25Odd', underId: 'under25Odd' },
-        { line: 3.5, key: '3.5', overId: 'over35Odd', underId: 'under35Odd' }
-    ];
-
-    fullTimeGoalLines.forEach(cfg => {
-        const overProb = calculateCombinedOverProbability(stats.homeGoals, stats.awayGoals, cfg.line);
-        const underProb = Math.max(0, Math.min(1, 1 - overProb));
-
-        updateOddElement(cfg.overId, `button[data-market="total-goals"][data-outcome="over-${cfg.key}"]`, overProb);
-        updateOddElement(cfg.underId, `button[data-market="total-goals"][data-outcome="under-${cfg.key}"]`, underProb);
-    });
-
-    // Both Teams To Score
-    const homeScoreProb = 1 - (stats.homeGoals[0] / total);
-    const awayScoreProb = 1 - (stats.awayGoals[0] / total);
-    const bttsYesProb = homeScoreProb * awayScoreProb;
-    const bttsNoProb = 1 - bttsYesProb;
-
-    updateOddElement('bttsYesOdd', 'button[data-outcome="yes"]', bttsYesProb);
-    updateOddElement('bttsNoOdd', 'button[data-outcome="no"]', bttsNoProb);
-
-    // First Half Goals Markets
-    const firstHalfGoalLines = [
-        { line: 0.5, key: '0.5', overId: 'fhOver05Odd', underId: 'fhUnder05Odd' },
-        { line: 1.5, key: '1.5', overId: 'fhOver15Odd', underId: 'fhUnder15Odd' },
-        { line: 2.5, key: '2.5', overId: 'fhOver25Odd', underId: 'fhUnder25Odd' }
-    ];
-
-    firstHalfGoalLines.forEach(cfg => {
-        const overProb = calculateCombinedOverProbability(stats.firstHalfHome, stats.firstHalfAway, cfg.line);
-        const underProb = Math.max(0, Math.min(1, 1 - overProb));
-
-        updateOddElement(cfg.overId, `button[data-market="fh-goals"][data-outcome="over-${cfg.key}"]`, overProb);
-        updateOddElement(cfg.underId, `button[data-market="fh-goals"][data-outcome="under-${cfg.key}"]`, underProb);
-    });
-
-    // --- NEW: Clean Sheet Market (Pre-match) ---
-    const redCleanSheetProb = stats.awayGoals[0] / total;
-    const blueCleanSheetProb = stats.homeGoals[0] / total;
-    updateOddElement('redCleanSheetOdd', 'button[data-outcome="red-clean-sheet"]', redCleanSheetProb);
-    updateOddElement('blueCleanSheetOdd', 'button[data-outcome="blue-clean-sheet"]', blueCleanSheetProb);
-
-
+    priceFirstHalfMarkets(xg.fhHome, xg.fhAway);
 }
 
 /* --- BETTING STATE & PERSISTENCE --- */
@@ -1810,7 +1917,8 @@ function getMarketDisplayName(market) {
         'total-goals': 'Total Goals',
         'btts': 'Both Teams to Score',
         'fh-goals': 'First Half Goals',
-        'specials': 'Match Specials'
+        'specials': 'Match Specials',
+        'correct-score': 'Correct Score'
     };
     return marketNames[market] || market;
 }
@@ -2131,6 +2239,13 @@ function settleBets(matchResult) {
                 if (bet.outcome === 'no' && !matchResult.btts) status = 'won';
                 break;
 
+            case 'correct-score': {
+                const finalScore = `${matchResult.homeGoals}-${matchResult.awayGoals}`;
+                if (bet.outcome === finalScore) status = 'won';
+                if (bet.outcome === 'other' && !CORRECT_SCORES.includes(finalScore)) status = 'won';
+                break;
+            }
+
             case 'specials':
                 if (bet.outcome === 'red-clean-sheet' && matchResult.awayGoals === 0) status = 'won';
                 if (bet.outcome === 'blue-clean-sheet' && matchResult.homeGoals === 0) status = 'won';
@@ -2180,9 +2295,13 @@ function checkGameState() {
 setInterval(checkGameState, 1000);
 
 // Betting timer and message functions
-function startBettingTimer(seconds = 20) {
+const IN_PLAY_WINDOW_SECONDS = 8;
+let bettingPhase = 'prematch'; // 'prematch' | 'halftime' | 'inplay' - decides what closing the window does
+
+function startBettingTimer(seconds = 20, phase = 'prematch') {
     bettingTimeLeft = seconds;
     bettingWindowOpen = true;
+    bettingPhase = phase;
 
     if (bettingTimer) clearInterval(bettingTimer);
 
@@ -2194,7 +2313,7 @@ function startBettingTimer(seconds = 20) {
         bettingTimeLeft--;
         updateBettingTimerDisplay();
 
-        if (bettingTimeLeft === 10 || bettingTimeLeft === 5) {
+        if ((bettingTimeLeft === 10 || bettingTimeLeft === 5) && bettingTimeLeft < seconds) {
             showBetMessage(`Betting closes in ${bettingTimeLeft} seconds!`, 'warning');
         } else if (bettingTimeLeft <= 0) {
             closeBettingWindow();
@@ -2217,15 +2336,16 @@ function closeBettingWindow({ kickOff = true } = {}) {
 
     if (!kickOff) return;
 
-    if (!gameStarted && !gameRunning) {
-        // Pre-match window closed: kick off
+    if (bettingPhase === 'prematch') {
         showBetMessage('Betting window closed - match starting!', 'warning');
         showGameMessage("KICK OFF!", 1000);
         scheduleForMatch(startPlay, 1000);
-    } else if (gameHalf === 1 && !gameRunning) {
-        // Halftime window closed: start the second half
+    } else if (bettingPhase === 'halftime') {
         showBetMessage('Halftime betting closed - 2nd half starting!', 'warning');
         startSecondHalf();
+    } else if (bettingPhase === 'inplay') {
+        showBetMessage('In-play betting closed - play restarts!', 'warning');
+        scheduleForMatch(startPlay, 500);
     }
 }
 
@@ -2326,191 +2446,70 @@ function poissonProbability(k, lambda) {
     return (part1 * part2) / part3;
 }
 
+// Average injury time added to each half (see updateTimer), for pricing the time left
+const AVG_INJURY_TIME = { first: 2, second: 4.5 };
+
 /**
- * Calculates and displays updated "live" odds at halftime
- * using a Poisson Distribution model.
+ * Goals each team is still expected to score from now on, scaled by the time left.
+ * Once injury time is announced its real length is used.
  */
-function updateLiveOdds() {
-    
-    // --- 1. Get Base Data ---
-    // Get current score
-    const currentHomeGoals = score.red;
-    const currentAwayGoals = score.blue;
+function remainingExpectedGoals() {
+    const xg = getExpectedGoals();
+    const secondHalf = {
+        home: Math.max(0.01, xg.home - xg.fhHome),
+        away: Math.max(0.01, xg.away - xg.fhAway)
+    };
+    const fractionLeft = (start, nominalLength, avgInjury, actualInjury) => {
+        const end = start + nominalLength + (injuryTimeStarted ? actualInjury : avgInjury);
+        return Math.max(0, Math.min(1, (end - timer) / (nominalLength + avgInjury)));
+    };
 
-    // Get 2nd Half Goal Expectancy (Lambda) from historical stats
-    // These are the *expected* goals for the 2nd half only.
-    const lambda_home_remaining = historicalStats.avgHomeGoals - historicalStats.avgFirstHalfHome; // ~0.59
-    const lambda_away_remaining = historicalStats.avgAwayGoals - historicalStats.avgFirstHalfAway; // ~0.613
-
-    // --- 2. Calculate Probability Matrix ---
-    let totalHomeWinProb = 0;
-    let totalDrawProb = 0;
-    let totalAwayWinProb = 0;
-    // Track total goal probabilities for multiple lines
-    const totalGoalLines = [
-        {
-            line: 1.5,
-            overId: 'over15Odd',
-            overSelector: 'button[data-outcome="over-1.5"]',
-            underId: 'under15Odd',
-            underSelector: 'button[data-outcome="under-1.5"]'
-        },
-        {
-            line: 2.5,
-            overId: 'over25Odd',
-            overSelector: 'button[data-outcome="over-2.5"]',
-            underId: 'under25Odd',
-            underSelector: 'button[data-outcome="under-2.5"]'
-        },
-        {
-            line: 3.5,
-            overId: 'over35Odd',
-            overSelector: 'button[data-outcome="over-3.5"]',
-            underId: 'under35Odd',
-            underSelector: 'button[data-outcome="under-3.5"]'
-        }
-    ];
-
-    const totalGoalsProbabilities = totalGoalLines.reduce((acc, cfg) => {
-        acc[cfg.line] = 0;
-        return acc;
-    }, {});
-
-    let totalBTTS_Yes_Prob = 0;
-    let totalProbSum = 0; // For normalization
-
-    const max_goals_to_calc = 8; // Calculate up to 8 more goals for each team
-
-    // Pre-calculate Poisson probabilities for each team to save computation
-    let homeProbs = [];
-    let awayProbs = [];
-    for (let k = 0; k <= max_goals_to_calc; k++) {
-        homeProbs[k] = poissonProbability(k, lambda_home_remaining);
-        awayProbs[k] = poissonProbability(k, lambda_away_remaining);
+    if (gameHalf === 1) {
+        const left = fractionLeft(0, halftimeSeconds, AVG_INJURY_TIME.first, injuryTime.first);
+        return {
+            fhHome: xg.fhHome * left,
+            fhAway: xg.fhAway * left,
+            home: xg.fhHome * left + secondHalf.home,
+            away: xg.fhAway * left + secondHalf.away,
+            firstHalfOpen: left > 0
+        };
     }
+    const left = fractionLeft(halftimeSeconds, halftimeSeconds, AVG_INJURY_TIME.second, injuryTime.second);
+    return { fhHome: 0, fhAway: 0, home: secondHalf.home * left, away: secondHalf.away * left, firstHalfOpen: false };
+}
 
-    // --- 3. Sum Probabilities for Each Market ---
-    for (let k_home = 0; k_home <= max_goals_to_calc; k_home++) {
-        for (let k_away = 0; k_away <= max_goals_to_calc; k_away++) {
-            
-            // Probability of (k_home) more home goals AND (k_away) more away goals
-            const prob_this_outcome = homeProbs[k_home] * awayProbs[k_away];
-            
-            if (prob_this_outcome === 0) continue; // Skip if probability is negligible
-
-            // Calculate the final score based on this outcome
-            const final_home_goals = currentHomeGoals + k_home;
-            const final_away_goals = currentAwayGoals + k_away;
-            const final_total_goals = final_home_goals + final_away_goals;
-
-            // --- A. 1x2 Market (Full Time) ---
-            if (final_home_goals > final_away_goals) {
-                totalHomeWinProb += prob_this_outcome;
-            } else if (final_home_goals < final_away_goals) {
-                totalAwayWinProb += prob_this_outcome;
-            } else {
-                totalDrawProb += prob_this_outcome;
-            }
-
-            // --- B. Total Goals (Over/Under 2.5) ---
-            totalGoalLines.forEach(cfg => {
-                if (final_total_goals > cfg.line) {
-                    totalGoalsProbabilities[cfg.line] += prob_this_outcome;
-                }
-            });
-
-            // --- C. BTTS (Both Teams to Score) ---
-            if (final_home_goals > 0 && final_away_goals > 0) {
-                totalBTTS_Yes_Prob += prob_this_outcome;
-            }
-            
-            totalProbSum += prob_this_outcome;
-        }
-    }
-
-    // --- 4. Normalize and Update Odds ---
-
-    // --- 1x2 Market ---
-    // Normalize probabilities (to account for max_goals_to_calc cap)
-    const finalHomeProb = totalHomeWinProb / totalProbSum;
-    const finalDrawProb = totalDrawProb / totalProbSum;
-    const finalAwayProb = totalAwayWinProb / totalProbSum;
-    
-    updateOddElement('redWinOdd', 'button[data-outcome="red-win"]', finalHomeProb);
-    updateOddElement('drawOdd', 'button[data-outcome="draw"]', finalDrawProb);
-    updateOddElement('blueWinOdd', 'button[data-outcome="blue-win"]', finalAwayProb);
-
-
-    // --- Total Goals Markets ---
-    const currentTotalGoals = currentHomeGoals + currentAwayGoals;
-    totalGoalLines.forEach(cfg => {
-        const overButton = document.querySelector(cfg.overSelector);
-        const underButton = document.querySelector(cfg.underSelector);
-
-        if (currentTotalGoals > cfg.line) {
-            // Market is already settled as Over
-            disableMarketButton(overButton, "Settled (Over)");
-            disableMarketButton(underButton, "Settled (Over)");
+// First-half goal lines on top of the first-half score so far
+function priceFirstHalfMarkets(lambdaHome, lambdaAway, homeNow = 0, awayNow = 0) {
+    const m = marketProbabilities(lambdaHome, lambdaAway, homeNow, awayNow, FIRST_HALF_LINES);
+    FIRST_HALF_LINES.forEach(line => {
+        const over = oddsSelector('fh-goals', `over-${line}`);
+        const under = oddsSelector('fh-goals', `under-${line}`);
+        if (homeNow + awayNow > line) {
+            disableMarketButton(document.querySelector(over), 'Settled (Over)');
+            disableMarketButton(document.querySelector(under), 'Settled (Over)');
             return;
         }
-
-        if (totalProbSum === 0) {
-            disableMarketButton(overButton, "N/A");
-            disableMarketButton(underButton, "N/A");
-            return;
-        }
-
-        const finalOverProb = totalGoalsProbabilities[cfg.line] / totalProbSum;
-        const finalUnderProb = 1.0 - finalOverProb;
-
-        updateOddElement(cfg.overId, cfg.overSelector, finalOverProb);
-        updateOddElement(cfg.underId, cfg.underSelector, finalUnderProb);
+        updateOddElement(`fhOver${lineKey(line)}Odd`, over, m.over[line]);
+        updateOddElement(`fhUnder${lineKey(line)}Odd`, under, 1 - m.over[line]);
     });
-    
-    // --- BTTS Market ---
-    if (currentHomeGoals > 0 && currentAwayGoals > 0) {
-        // Market is already settled as YES
-        disableMarketButton(document.querySelector('button[data-outcome="yes"]'), "Settled (Yes)");
-        disableMarketButton(document.querySelector('button[data-outcome="no"]'), "Settled (Yes)");
+}
+
+/**
+ * Live odds (halftime and after goals): price the rest of the match on top of the
+ * current score. Markets that are already decided are closed.
+ */
+function updateInPlayOdds() {
+    const xg = remainingExpectedGoals();
+    priceFullTimeMarkets(xg.home, xg.away);
+
+    if (xg.firstHalfOpen) {
+        priceFirstHalfMarkets(xg.fhHome, xg.fhAway, currentMatch.firstHalfHomeGoals, currentMatch.firstHalfAwayGoals);
     } else {
-        // Normalize BTTS probability
-        const finalBTTS_Yes_Prob = totalBTTS_Yes_Prob / totalProbSum;
-        const finalBTTS_No_Prob = 1.0 - finalBTTS_Yes_Prob;
-
-        updateOddElement('bttsYesOdd', 'button[data-outcome="yes"]', finalBTTS_Yes_Prob);
-        updateOddElement('bttsNoOdd', 'button[data-outcome="no"]', finalBTTS_No_Prob);
+        // First-half markets are decided at halftime
+        document.querySelectorAll('button[data-market="fh-goals"]').forEach(btn => {
+            disableMarketButton(btn, "Market Closed");
+        });
     }
-
-    // --- NEW: Clean Sheet Market (Halftime) ---
-    const redCleanSheetButton = document.querySelector('button[data-outcome="red-clean-sheet"]');
-    const blueCleanSheetButton = document.querySelector('button[data-outcome="blue-clean-sheet"]');
-
-    // Red Clean Sheet (Blue scores 0)
-    if (currentAwayGoals > 0) {
-        // Red cannot get a clean sheet if Blue already scored
-        disableMarketButton(redCleanSheetButton, "Settled (No)");
-    } else {
-        // Prob of Red clean sheet = Prob of Blue scoring 0 goals in 2nd half
-        const redCleanSheetProb = poissonProbability(0, lambda_away_remaining);
-        // We don't need to normalize this, it's a direct probability
-        updateOddElement('redCleanSheetOdd', 'button[data-outcome="red-clean-sheet"]', redCleanSheetProb);
-    }
-
-    // Blue Clean Sheet (Red scores 0)
-    if (currentHomeGoals > 0) {
-        // Blue cannot get a clean sheet if Red already scored
-        disableMarketButton(blueCleanSheetButton, "Settled (No)");
-    } else {
-        // Prob of Blue clean sheet = Prob of Red scoring 0 goals in 2nd half
-        const blueCleanSheetProb = poissonProbability(0, lambda_home_remaining);
-        updateOddElement('blueCleanSheetOdd', 'button[data-outcome="blue-clean-sheet"]', blueCleanSheetProb);
-    }
-
-    // --- First Half Goals Market ---
-    // This market is always closed at halftime.
-    document.querySelectorAll('button[data-market="fh-goals"]').forEach(btn => {
-        disableMarketButton(btn, "Market Closed");
-    });
 }
 
 /**
@@ -2686,14 +2685,131 @@ function syncOverlayWithGameState() {
 }
 
 
+/* --- SOUND --- */
+
+// Synthesised with Web Audio, so there are no sound files to load. The audio context is
+// only created after the first click/keypress (browsers block audio before that).
+const Sound = (() => {
+    const STORAGE = 'marbleFootball.sound';
+    let ctx = null;
+    let enabled = true;
+    let lastKick = 0;
+    try { enabled = localStorage.getItem(STORAGE) !== 'off'; } catch (e) { /* default on */ }
+
+    // Only in normal play: no sound in batch mode or when fast-forwarding hard
+    const audible = () => enabled && ctx && ctx.state === 'running' && !autoMode && !simulationMode && gameSpeed <= 3;
+
+    function unlock() {
+        if (!ctx) {
+            const AudioCtx = window.AudioContext || window.webkitAudioContext;
+            if (!AudioCtx) return;
+            ctx = new AudioCtx();
+        }
+        if (ctx.state === 'suspended') ctx.resume();
+    }
+
+    function envelope(gainNode, start, attack, hold, release, peak) {
+        const g = gainNode.gain;
+        g.setValueAtTime(0.0001, start);
+        g.exponentialRampToValueAtTime(peak, start + attack);
+        g.setValueAtTime(peak, start + attack + hold);
+        g.exponentialRampToValueAtTime(0.0001, start + attack + hold + release);
+    }
+
+    function kick(ballSpeed) {
+        if (!audible()) return;
+        const now = ctx.currentTime;
+        if (now - lastKick < 0.07) return; // avoid a buzz when several players touch at once
+        lastKick = now;
+        const osc = ctx.createOscillator();
+        const gain = ctx.createGain();
+        osc.type = 'triangle';
+        osc.frequency.setValueAtTime(170 + ballSpeed * 6, now);
+        osc.frequency.exponentialRampToValueAtTime(70, now + 0.08);
+        envelope(gain, now, 0.004, 0.01, 0.08, Math.min(0.25, 0.06 + ballSpeed * 0.015));
+        osc.connect(gain).connect(ctx.destination);
+        osc.start(now);
+        osc.stop(now + 0.12);
+    }
+
+    function whistle(blasts = 1) {
+        if (!audible()) return;
+        for (let i = 0; i < blasts; i++) {
+            const start = ctx.currentTime + i * 0.38;
+            const length = i === blasts - 1 && blasts > 1 ? 0.55 : 0.28;
+            const osc = ctx.createOscillator();
+            const trill = ctx.createOscillator(); // the pea in the whistle
+            const trillDepth = ctx.createGain();
+            const gain = ctx.createGain();
+            osc.type = 'sine';
+            osc.frequency.value = 2650;
+            trill.frequency.value = 28;
+            trillDepth.gain.value = 140;
+            trill.connect(trillDepth).connect(osc.frequency);
+            envelope(gain, start, 0.02, length, 0.06, 0.08);
+            osc.connect(gain).connect(ctx.destination);
+            osc.start(start); trill.start(start);
+            osc.stop(start + length + 0.1); trill.stop(start + length + 0.1);
+        }
+    }
+
+    function crowd(duration = 2.6) {
+        if (!audible()) return;
+        const now = ctx.currentTime;
+        const buffer = ctx.createBuffer(1, Math.floor(ctx.sampleRate * duration), ctx.sampleRate);
+        const data = buffer.getChannelData(0);
+        for (let i = 0; i < data.length; i++) data[i] = Math.random() * 2 - 1;
+        const noise = ctx.createBufferSource();
+        noise.buffer = buffer;
+        const band = ctx.createBiquadFilter();
+        band.type = 'bandpass';
+        band.frequency.value = 700;
+        band.Q.value = 0.6;
+        const gain = ctx.createGain();
+        envelope(gain, now, 0.25, 0.6, duration - 0.9, 0.35);
+        noise.connect(band).connect(gain).connect(ctx.destination);
+        noise.start(now);
+    }
+
+    function render(button) {
+        button.textContent = enabled ? '🔊' : '🔇';
+        button.setAttribute('aria-pressed', String(enabled));
+        button.title = enabled ? 'Sound on (click to mute)' : 'Sound off (click to unmute)';
+    }
+
+    function init() {
+        // The first user gesture anywhere unlocks audio
+        const unlockOnce = () => {
+            unlock();
+            window.removeEventListener('pointerdown', unlockOnce);
+            window.removeEventListener('keydown', unlockOnce);
+        };
+        window.addEventListener('pointerdown', unlockOnce);
+        window.addEventListener('keydown', unlockOnce);
+
+        const button = document.getElementById('soundToggle');
+        if (!button) return;
+        render(button);
+        button.addEventListener('click', () => {
+            enabled = !enabled;
+            try { localStorage.setItem(STORAGE, enabled ? 'on' : 'off'); } catch (e) { /* not saved */ }
+            render(button);
+            if (enabled) { unlock(); whistle(1); }
+        });
+    }
+
+    return { init, kick, whistle, goal: () => { crowd(); whistle(1); } };
+})();
+
 /* --- BOOT --- */
 
 // Runs after the whole script has been evaluated, so every top-level binding exists.
 function boot() {
     startGameWhenReady();
+    Sound.init();
     try {
         initializeBetting();
-        startBettingTimer(20); // Initial pre-match betting window
+        startBettingTimer(20, 'prematch'); // Initial pre-match betting window
         showBetMessage('Welcome! Betting window is open - place your bets!', 'info');
     } catch (error) {
         console.error('Error initializing betting system:', error);
